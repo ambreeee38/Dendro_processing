@@ -1,0 +1,10 @@
+!Script/
+
+*Input/
+*Output/
+
+
+*.Rproj.user
+*.Rhistory
+*.RData
+*.Ruserdata
