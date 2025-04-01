@@ -738,7 +738,7 @@ if(TRUE) {
   #Ensuite, une moyenne de ces valeurs est réalisée à l'échelle de la placette avec un
   #chiffre après la virgule qui est conservé.
   
-  #/!\ PB AVEC APPARITION DE NaN A CORRIGER
+ 
   
   
   decompo <- function(data) {
@@ -754,7 +754,7 @@ if(TRUE) {
     
     return(data)
   }
-  
+  test<-decompo(data_dmh)
   
 }
 

@@ -5,7 +5,9 @@
  library(tidyverse) #tidyverse contient pas mal de fonctions très utliles (ggplot, readxl, readr, %>%). Il fait partie des packages de dplyr
  library(openxlsx) #permet d'utiliser la fonction write.xlsx très pratique pour enregistrer des dataframe de r vers excel
  library(readxl) #permet d'ouvrir un fichier Excel
-
+ library(ggplot2)
+library(viridis)
+library(corrplot)
 
 #### 2. Configuration du chemin de direction ####
 if(FALSE){
