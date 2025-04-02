@@ -8,6 +8,8 @@
  library(ggplot2)
 library(viridis)
 library(corrplot)
+library(gridExtra)
+library(patchwork)
 
 #### 2. Configuration du chemin de direction ####
 if(FALSE){
@@ -18,6 +20,7 @@ if(FALSE){
   ## Définition des chemins d'accès aux inputs (soit les jeux de données avec lesquels nous travaillons)
   
   Input_case_file <-file.path(root_dir, "Input")
+  Input_case_file_ventoux <-file.path(Input_case_file, "Input_ventoux")
   Input_couvert_case_file <-file.path(Input_case_file, "Input_couvert")
   Input_dmh_case_file <-file.path(Input_case_file, "Input_dmh")
   Input_oiseaux_case_file <-file.path(Input_case_file, "Input_oiseaux")
@@ -26,5 +29,7 @@ if(FALSE){
   ## Définition des chemins d'accès output (soit là où les fichiers de sortie seront stockés)
   
   Output_file <-file.path(root_dir, "Output")
+  Output_file_ventoux <- file.path (Output_file, "Output_ventoux")
+  
 
 }

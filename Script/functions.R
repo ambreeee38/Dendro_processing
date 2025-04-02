@@ -887,7 +887,7 @@ write.xlsx(dmh_filtered, file = file_output_dmh)
 }
 
 
- #### 2. JEU COUVERT ####
+#### 2. JEU COUVERT ####
 
 
 
@@ -1214,7 +1214,7 @@ if(TRUE) {
 }
 
  
-  #### 3. FUSION DES JEUX DE DONNEES COUVERT ET DMH
+#### 3. FUSION DES JEUX DE DONNEES COUVERT ET DMH ####
 
    ### 3.0. Definition des modalités de sortie des jeux de données couvert_dmh_merged ###
 
@@ -1276,6 +1276,7 @@ if(TRUE) {
   file_data_sites_sp<-file.path(Input_bird_case_file, "sites_sp.xlsx")
   file_data_code_latin<-file.path(Input_bird_case_file, "code_latin.xlsx")
   file_data_bird <-read_excel(file.path(Input_bird_case_file, "Saisie_oiseaux_2024.xlsx"), sheet = "DATA")
+  file_data_spe <- file.path(Input_bird_case_file, "spec_test.xlsx")
   data_bird<- file_data_bird
   
   ## SORTIE
