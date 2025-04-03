@@ -32,11 +32,8 @@ corrplot(cor_matrix, method = "color", type = "upper",
 }
 
  #### 2. VISUALISATION GRAPHIQUE ####
-
-
-  ### 2.1. Visualisation graphique nidification ###
    
-    ## 2.1.1. Visualisation graphique guildes et variables liées au bois mort ##
+ ### 2.1. Visualisation graphique guildes et variables liées au bois mort ###
 
 
   
@@ -47,7 +44,7 @@ corrplot(cor_matrix, method = "color", type = "upper",
   #graph.
 
 
-        # 2.1.1.1. Volume bois mort total #
+        ## 2.1.1. Volume bois mort total ##
 
 if(TRUE) {
   
@@ -121,7 +118,7 @@ nid_bm + alim_bm
 }
 
    
-      # 2.1.1.2. Densité bois mort total #
+      # 2.1.2. Densité bois mort total #
 
 if(TRUE) {
   
@@ -170,7 +167,7 @@ if(TRUE) {
     geom_boxplot(alpha = 0.7, outlier.shape = NA) +  # Ajoute un boxplot et cache les outliers
     labs(title = "Richesse spécifique selon la densite de bois mort",
          x = "Classe de densite de bois mort",
-         y = "Richesse spécifique moyenne par placette") +
+         y = "Richesse spécifique") +
     scale_fill_manual(values = cb_palette_nid) +  # Palette de couleurs
     scale_color_manual(values = cb_palette_nid) +  # Même couleur pour les points
     theme_minimal(base_size = 14) +  
@@ -178,6 +175,8 @@ if(TRUE) {
           panel.grid.major = element_line(color = "gray85"),  
           panel.grid.minor = element_blank(),
           axis.text.x = element_text(angle = 40, hjust = 1))  # Rotation pour lisibilité
+  
+  nid_bm_densite
   
   
   #BARPLOT#
@@ -215,18 +214,21 @@ if(TRUE) {
   ventoux_BD_nid <- ventoux_BD_nid %>%
     filter(!is.na(Richness_nid_ass), !is.na(classes_bm1), !is.na(Richness_nid))
   
-  # Barplot avec ggplot
-  nid_bm_densite <- ggplot(richesse_moyenne, aes(x = classes_bm1, y = Richesse_moyenne, fill = Richness_nid)) +
-    geom_bar(stat = "identity", position = "dodge", alpha = 1) +  # Barplot
+  
+  
+  
+  
+  nid_bm_densite_barplot <- ggplot(richesse_moyenne, aes(x = classes_bm1, y = Richesse_moyenne, fill = Richness_nid)) +
+    geom_bar(stat = "identity", position = "dodge", alpha = 1) +  
     labs(title = "Richesse spécifique selon la densité de bois mort",
          x = "Classe de densité de bois mort",
          y = "Richesse spécifique moyenne par placette") +
-    scale_fill_manual(values = cb_palette_nid) +  # Palette de couleurs
+    scale_fill_manual(values = cb_palette_nid) +  
     theme_minimal(base_size = 14) +  
     theme(legend.position = "top",  
           panel.grid.major = element_line(color = "gray85"),  
           panel.grid.minor = element_blank(),
-          axis.text.x = element_text(angle = 40, hjust = 1))  # Rotation pour lisibilité
+          axis.text.x = element_text(angle = 40, hjust = 1))  
   
  nid_bm_densite
   
@@ -310,12 +312,13 @@ if(TRUE) {
           panel.grid.minor = element_blank(),
           axis.text.x = element_text(angle = 40, hjust = 1))  # Rotation pour lisibilité
   
-  alim_bm_densite + nid_bm_densite
+ (nid_bm_densite_barplot + nid_bm_densite) /nid_bm
+  
   
 }
 
 
-       # 2.1.1.3. Taux de décomposition moyen du bois sur la placette #
+       # 2.1.3. Taux de décomposition moyen du bois sur la placette #
 
 if(TRUE) {
   
@@ -429,7 +432,7 @@ if(TRUE) {
 }
 
 
-   # 2.1.1.4. Densite souche (indice de défrichement) #
+      # 2.1.4. Densite souche (indice de défrichement) #
 
 
 if(TRUE) {
@@ -557,4 +560,382 @@ if(TRUE) {
   
 }
 
-  # 2.1.1.5.  #
+
+      ### 2.2. Visualisation graphique guildes et variables liées à la canopée ###
+
+if(TRUE) {
+  
+  #Pour la desnité de la canopée, des classes sont effectuées, définies selon l'IGN BD foret :
+  
+  #(i) Milieu ouvert (Couvert < 10%)
+  #(ii) Forêt ouverte (10% < densité canopée < 40%)
+  #(iii) Forêt fermée (Couvert > 40%)
+  
+  
+  
+  
+  #NIDIFICATION#
+  #------------#
+  
+  
+  
+  ventoux_BD_nid <- ventoux_BD_nid %>%
+    mutate (ouverture_canope = case_when(
+      densite_canopy < 10 ~ "Milieu ouvert",
+      densite_canopy >= 10 & densite_canopy <= 40 ~ "Foret ouverte",
+      densite_canopy > 40 ~ "Foret fermee"
+    ))
+  
+  # Calcul de la richesse spécifique moyenne par placette
+  effectifs_moyens_canopy <- ventoux_BD_nid %>%
+    group_by(ouverture_canope, Richness_nid) %>%
+    summarise(Richness_moyenne_canopy = mean(Richness_nid_ass), .groups = "drop")
+  
+ nid_canope<- ggplot(effectifs_moyens_canopy, aes(x= ouverture_canope, y= Richness_moyenne_canopy, fill= Richness_nid))+
+         geom_bar(stat = "identity", position = "dodge", alpha = 1) +  
+                    labs(title = "Richesse spécifique selon la densite de la canopé",
+                         x = "Ouverture de la canopée",
+                         y = "Richesse spécifique moyenne") +
+                    scale_fill_manual(values = cb_palette_nid) +  
+                    theme_minimal(base_size = 14) +  
+                    theme(legend.position = "top",  
+                          panel.grid.major = element_line(color = "gray85"),  
+                          panel.grid.minor = element_blank(),
+                          axis.text.x = element_text(angle = 40, hjust = 1)) 
+  
+  
+  
+  
+  #ALIMENTATION#
+  #------------#
+  
+  
+  
+  
+  ventoux_BD_alim <- ventoux_BD_alim %>%
+    mutate (ouverture_canope = case_when(
+      densite_canopy < 10 ~ "Milieu ouvert",
+      densite_canopy >= 10 & densite_canopy <= 40 ~ "Foret ouverte",
+      densite_canopy > 40 ~ "Foret fermee"
+    ))
+  
+  
+  # Calcul de la richesse spécifique moyenne par placette
+  effectifs_moyens_canopy2 <- ventoux_BD_alim %>%
+    group_by(ouverture_canope, Richness_alim) %>%
+    summarise(Richness_moyenne_canopy = mean(Richness_alim_ass), .groups = "drop")
+  
+  alim_canope <- ggplot(effectifs_moyens_canopy2, aes(x= ouverture_canope, y= Richness_moyenne_canopy, fill= Richness_alim))+
+    geom_bar(stat = "identity", position = "dodge", alpha = 1) +  
+    labs(title = "Richesse spécifique selon la densite de la canopé",
+         x = "Ouverture de la canopée",
+         y = "Richesse spécifique moyenne") +
+    scale_fill_manual(values = cb_palette_alim) +  
+    theme_minimal(base_size = 14) +  
+    theme(legend.position = "top",  
+          panel.grid.major = element_line(color = "gray85"),  
+          panel.grid.minor = element_blank(),
+          axis.text.x = element_text(angle = 40, hjust = 1)) 
+  
+  
+  nid_canope + alim_canope
+         
+} 
+
+     
+      ### 2.3. Visualisation graphique guildes et variables liées aux DMH###
+
+if(TRUE) {
+  
+         ## 2.3.1. Densite DMH ##
+  
+  
+  
+  #NIDIFICATION#
+  #------------#
+  
+  
+  
+  nid_dmh_density <- ggplot(ventoux_BD_nid, aes(x = densite_dmh_ha, y = Richness_nid_ass, color = Richness_nid)) +
+    geom_point(alpha = 0.7, size = 2) +  
+    geom_smooth(method = "lm", se = TRUE, size = 1.2, alpha=0.2) +  
+    labs(title = "Richesse spécifique en fonction de la densite de DMH/ha",
+         x = "Densite DMH/ha",
+         y = "Richesse spécifique des groupes de nidification") +
+    scale_color_manual(values = cb_palette, 
+                       labels = c("Cavicole", "Arboricole", "Sol")) +
+    theme_minimal(base_size = 14) +  
+    theme(legend.title = element_blank(),  
+          legend.position = "top",  # Déplace la légende en haut
+          panel.grid.major = element_line(color = "gray85"),  
+          panel.grid.minor = element_blank())  # Supprime les petites lignes de grille
+  
+  
+  
+  
+  #ALIMENTATION#
+  #------------#
+  
+  
+
+  alim_dmh_density <- ggplot(ventoux_BD_alim, aes(x = densite_dmh_ha, y = Richness_alim_ass, color = Richness_alim)) +
+    geom_point(alpha = 0.7, size = 2) +  
+    geom_smooth(method = "lm", se = TRUE, size = 1.2, alpha=0.2) +  
+    labs(title = "Richesse spécifique en fonction de la densite de DMH/ha",
+         x = "Densite DMH/ha",
+         y = "Richesse spécifique des groupes de nidification") +
+    scale_color_manual(values = cb_palette_alim, 
+                       labels = c("Insectivore", "Omnivore", "Herbivore")) +
+    theme_minimal(base_size = 14) +  
+    theme(legend.title = element_blank(),  
+          legend.position = "top",  # Déplace la légende en haut
+          panel.grid.major = element_line(color = "gray85"),  
+          panel.grid.minor = element_blank())  # Supprime les petites lignes de grille
+  
+  nid_dmh_density + alim_dmh_density
+  
+  
+  
+  
+           ## 2.3.2. Diversite DMH ##
+  
+  
+  
+  #NIDIFICATION#
+  #------------#
+  
+  
+  
+  nid_dmh_diversity <- ggplot(ventoux_BD_nid, aes(x = diversite_DMH, y = Richness_nid_ass, color = Richness_nid)) +
+    geom_point(alpha = 0.7, size = 2) +  
+    geom_smooth(method = "lm", se = TRUE, size = 1.2, alpha=0.2) +  
+    labs(title = "Richesse spécifique en fonction de la diversité de DMH",
+         x = "Diversité DMH",
+         y = "Richesse spécifique des groupes de nidification") +
+    scale_color_manual(values = cb_palette, 
+                       labels = c("Cavicole", "Arboricole", "Sol")) +
+    theme_minimal(base_size = 14) +  
+    theme(legend.title = element_blank(),  
+          legend.position = "top",  # Déplace la légende en haut
+          panel.grid.major = element_line(color = "gray85"),  
+          panel.grid.minor = element_blank())  # Supprime les petites lignes de grille
+  
+  
+  
+  
+  #ALIMENTATION#
+  #------------#
+  
+  
+  
+  alim_dmh_diversity <- ggplot(ventoux_BD_alim, aes(x = diversite_DMH, y = Richness_alim_ass, color = Richness_alim)) +
+    geom_point(alpha = 0.7, size = 2) +  
+    geom_smooth(method = "lm", se = TRUE, size = 1.2, alpha=0.2) +  
+    labs(title = "Richesse spécifique en fonction de la diversite de DMH",
+         x = "Diversité DMH",
+         y = "Richesse spécifique des groupes de nidification") +
+    scale_color_manual(values = cb_palette_alim, 
+                       labels = c("Insectivore", "Omnivore", "Herbivore")) +
+    theme_minimal(base_size = 14) +  
+    theme(legend.title = element_blank(),  
+          legend.position = "top",  # Déplace la légende en haut
+          panel.grid.major = element_line(color = "gray85"),  
+          panel.grid.minor = element_blank())  # Supprime les petites lignes de grille
+  
+  nid_dmh_diversity + alim_dmh_diversity
+  
+}
+
+
+      ### 2.4. Visualisation graphique guildes et variables liées à la stratification verticale###
+
+if(TRUE) {
+  
+  #Pour cette visualisation graphique, on utilise le jeu de données "ventoux_BD1" auquel on va 
+  #faire un pivot_longer pour obtenir par placette le taux de recouvrement de chaque strate.
+  #Ensuite, on tracera les graph de rs_cavi, rs_arboricole, rs_sol... en fonction de ces 
+  #stratifications. Ce qui fait un total de 8 graphiques (1 strate*8 rs_). Si on utilisait ventoux_BD_nid
+  #ou alim cela ferait près de 12 graphiques pour avoir la richesse spécifique de chaque
+  #guilde en fonction de chaque strate (4 strates * 3 guildes)
+  
+  
+  ventoux_BD_strate <- ventoux_BD1 %>%
+    pivot_longer(cols = c(strate_h, strat_sa, strat_a, strat_A), 
+                 names_to = "stratification", 
+                 values_to = "pct_recouvrement") 
+  
+  ventoux_BD_strate$stratification<- factor(ventoux_BD_strate$stratification, levels = c("strate_h", "strat_sa", "strat_a", "strat_A"))
+  
+  
+  cb_palette_strate <- c("strate_h" = "#E69F00",
+                      "strat_sa" = "#8fd175", 
+                      "strat_a" = "brown",
+                      "strat_A" = "green")   
+  
+  
+  
+  
+  
+  #RS_CAVICOLE#
+  #-----------#
+  
+  
+  
+  
+  ggplot(ventoux_BD_strate, aes(x = pct_recouvrement, y = rs_Cavicole, color = stratification)) +
+    geom_point(alpha = 0.6) +  # Ajout des points pour visualiser les données
+    geom_smooth(method = "lm", se = TRUE) +  # Régression linéaire avec intervalle de confiance
+    theme_minimal() +
+    labs(
+      title = "Relation entre la richesse spécifique cavicole et le recouvrement des strates",
+      x = "Pourcentage de recouvrement",
+      y = "Richesse spécifique cavicole",
+      color = "Stratification"
+    ) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotation des labels
+  
+  
+  
+  
+  
+  #RS_ARBORICOLE#
+  #-------------#
+  
+  
+  
+  
+  ggplot(ventoux_BD_strate, aes(x = pct_recouvrement, y = rs_Arboricole, color = stratification)) +
+    geom_point(alpha = 0.6) +  # Ajout des points pour visualiser les données
+    geom_smooth(method = "lm", se = TRUE) +  # Régression linéaire avec intervalle de confiance
+    theme_minimal() +
+    labs(
+      title = "Relation entre la richesse spécifique cavicole et le recouvrement des strates",
+      x = "Pourcentage de recouvrement",
+      y = "Richesse spécifique arboricole",
+      color = "Stratification"
+    ) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotation des labels
+  
+  
+    
+  
+  
+  
+  #RS_SOL#
+  #------#
+  
+  
+  
+  
+  ggplot(ventoux_BD_strate, aes(x = pct_recouvrement, y = rs_Sol, color = stratification)) +
+    geom_point(alpha = 0.6) +  # Ajout des points pour visualiser les données
+    geom_smooth(method = "lm", se = TRUE) +  # Régression linéaire avec intervalle de confiance
+    theme_minimal() +
+    labs(
+      title = "Relation entre la richesse spécifique cavicole et le recouvrement des strates",
+      x = "Pourcentage de recouvrement",
+      y = "Richesse spécifique nicheurs au sol",
+      color = "Stratification"
+    ) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotation des labels
+  
+  
+  
+  
+  #RS_INSECTIVORES#
+  #---------------#
+  
+  
+  
+  ggplot(ventoux_BD_strate, aes(x = pct_recouvrement, y = rs_Insectivore, color = stratification)) +
+    geom_point(alpha = 0.6) +  # Ajout des points pour visualiser les données
+    geom_smooth(method = "lm", se = TRUE) +  # Régression linéaire avec intervalle de confiance
+    theme_minimal() +
+    labs(
+      title = "Relation entre la richesse spécifique cavicole et le recouvrement des strates",
+      x = "Pourcentage de recouvrement",
+      y = "Richesse spécifique insectivores",
+      color = "Stratification"
+    ) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotation des labels
+  
+  
+  
+  
+  
+  #RS_OMNIVORES#
+  #------------#
+  
+  
+  
+  ggplot(ventoux_BD_strate, aes(x = pct_recouvrement, y = rs_Omnivore, color = stratification)) +
+    geom_point(alpha = 0.6) +  # Ajout des points pour visualiser les données
+    geom_smooth(method = "lm", se = TRUE) +  # Régression linéaire avec intervalle de confiance
+    theme_minimal() +
+    labs(
+      title = "Relation entre la richesse spécifique cavicole et le recouvrement des strates",
+      x = "Pourcentage de recouvrement",
+      y = "Richesse spécifique omnivore",
+      color = "Stratification"
+    ) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotation des labels
+  
+  
+  
+  
+  
+  
+  
+  #RS_HERBIVORE#
+  #------------#
+  
+  
+  
+  
+  ggplot(ventoux_BD_strate, aes(x = pct_recouvrement, y = rs_Herbivore, color = stratification)) +
+    geom_point(alpha = 0.6) +  # Ajout des points pour visualiser les données
+    geom_smooth(method = "lm", se = TRUE) +  # Régression linéaire avec intervalle de confiance
+    theme_minimal() +
+    labs(
+      title = "Relation entre la richesse spécifique cavicole et le recouvrement des strates",
+      x = "Pourcentage de recouvrement",
+      y = "Richesse spécifique herbivore",
+      color = "Stratification"
+    ) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotation des label
+  
+  
+}
+ 
+     ### 2.5. Visualisation graphique guildes et variables liées à la compososition forestière ###
+
+if(TRUE) {
+  
+          ## 2.5.1. st_conifères et guildes alimentaires ##
+  
+  ventoux_BD_compo <- ventoux_BD1 %>%
+    pivot_longer(cols = c(pct_st_Conifère, pct_st_Feuillu), 
+                 names_to = "composition", 
+                 values_to = "pct_compo") 
+  
+  ventoux_BD_compo$composition<- factor(ventoux_BD_compo$composition, levels = c("pct_st_Conifère","pct_st_Feuillu"))
+  
+  
+  cb_palette_compo <- c("pct_st_Conifère" = "darkgreen",
+                         "pct_st_Feuillu" = "#8fd175")
+  
+  
+  
+  ggplot(ventoux_BD_compo, aes(x = pct_recouvrement, y = rs_Cavicole, color = stratification)) +
+    geom_point(alpha = 0.6) +  # Ajout des points pour visualiser les données
+    geom_smooth(method = "lm", se = TRUE) +  # Régression linéaire avec intervalle de confiance
+    theme_minimal() +
+    labs(
+      title = "Relation entre la richesse spécifique cavicole et le recouvrement des strates",
+      x = "Pourcentage de recouvrement",
+      y = "Richesse spécifique cavicole",
+      color = "Stratification"
+    ) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotation des labels
+  
+}

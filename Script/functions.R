@@ -14,7 +14,7 @@
 
 #La configuration R est expliquée dans le jeu de donnée "config.R"
 
-source("config.R")
+source(config.R)
 
  SITE = "ventoux"
 
