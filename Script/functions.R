@@ -126,7 +126,7 @@ if(TRUE){
   }
   
 }
-  
+ 
 
   ### 1.2. ESSENCES ARBRES ###
 
@@ -152,7 +152,7 @@ if(TRUE) {
       return (data)
   }
   
-
+  
 
   
   Typologie_essence <- function(data) {
@@ -274,10 +274,7 @@ if(TRUE){
     
   }
   
-  
-  
-  
-  
+
   ## 1.3.4. Calcul de la densite de BV >30 cm DBH ##
   
   
@@ -314,7 +311,7 @@ if(TRUE){
     
     
   }  
-    
+ 
     
   ## 1.3.5. Calcul de la densite de BMS ##
     
@@ -367,11 +364,7 @@ if(TRUE) {
   
 }
     
- 
-    
-    
-    
-    
+
   ## 1.3.7. Calcul de la densite de BM TOTALE ##
 
 
@@ -490,7 +483,6 @@ if (TRUE) {
   
 }
 
-
  ## 1.4.2. Calcul de la densite propre à chaque arbre à l'ha ##
 
 
@@ -514,6 +506,7 @@ if (TRUE) {
    
  }
 
+ 
 
   ## 1.4.3. Calcul des volumes de BMD et BMS  ##
 
@@ -547,24 +540,19 @@ if(TRUE) {
   
    ## 1.4.3.1 Calcul du volume de BMD ##
   
-      ## 1.4.3.1.1 Calcul du BMD par individu (m3/ind) ##
+      ## 1.4.3.1.1. Calcul du BMD par individu (m3/ind) ##
   
   volume_BMD_ind <- function(data) {
     data<-data %>%
       mutate(
         vol_BMD_ind = case_when(
           type.objet == "BMD" & !is.na(diam) & !is.na(hauteur) ~ 
-            (pi / 40000 * ((diam) - (hauteur / 2 - 1.3))^2)* hauteur, 
-          type.objet == "BMD" & (is.na(diam) | is.na(hauteur)) ~ NA_real_,
-          TRUE ~ NA_real_
+            (pi / 40000 * ((diam) - (hauteur / 2 - 1.3))^2)* hauteur
         )
-      ) %>%
-      mutate(
-        vol_BMD_ind = if_else(vol_BMD_ind == 0, NA_real_, vol_BMD_ind) 
-      )
-  }
-  
-  ## 1.4.3.1.2 Calcul du BMD par individu par ha (m3/ind/ha) ##
+      ) 
+  } 
+
+  ## 1.4.3.1.2. Calcul du BMD par individu par ha (m3/ind/ha) ##
   
   volume_BMD_ha <- function(data) {
     data<-data %>%
@@ -573,7 +561,7 @@ if(TRUE) {
       ) 
   }
   
-    ## 1.4.3.1.3  Calcul du volume total de BMD à l'ha pour toutes les placettes ( BMD tot m3/ha) ##
+    ## 1.4.3.1.3.  Calcul du volume total de BMD à l'ha pour toutes les placettes ( BMD tot m3/ha) ##
   
   volume_BMD_tot <- function(data) {
     data<-data %>%
@@ -581,7 +569,7 @@ if(TRUE) {
       mutate(vol_BMD_tot = sum(vol_BMD_ha, na.rm = TRUE)) %>%  
       ungroup()  
   }
-  
+ 
   
   ## 1.4.3.2 Calcul du volume de BMS ##
   
@@ -593,17 +581,14 @@ if(TRUE) {
       mutate(
         vol_BMS_ind = case_when(
           type.objet == "BMS" & !is.na(diam.med) & !is.na(longueur) ~ 
-            pi / 40000 * (diam.med^2) * longueur,  # Formule pour diam.med en cm et longueur en m
+            pi / 40000 * (diam.med^2) * longueur,
           type.objet == "BMS" & (is.na(diam.med) | is.na(longueur)) ~ NA_real_,
-          TRUE ~ NA_real_
+          TRUE ~ NA_real_  # Pour les objets qui ne sont pas BMS
         )
-      ) %>%
-      mutate(
-        vol_BMS_ind = if_else(vol_BMS_ind == 0, NA_real_, vol_BMS_ind)
       )
-    
     return(data)  
   }
+  
   
    ## 1.4.3.2.2 Calcul du BMS par individu par ha (m3/ind/ha) ##
   
@@ -650,7 +635,48 @@ if(TRUE) {
   
 }
 
+ ## 1.4.5. Calcul du volume de chandelles ##
+ 
+ if(TRUE) {
+   
+ 
+   ## 1.4.5.1. Calcul de chandelles par individu (m3/ind) ##
+ 
+ volume_chand_ind <- function(data) {
+   data <- data %>%
+     mutate(
+       vol_chandelle_ind = case_when(
+         Type.BM == "V" & !is.na(diam) & !is.na(hauteur) ~ 
+           (pi / 40000 * ((diam) - (hauteur / 2 - 1.3))^2) * hauteur
+       )
+     )
+   
+   return(data)
+ }
+ 
+ 
 
+
+ ## 1.4.3.1.2 Calcul du BMD par individu par ha (m3/ind/ha) ##
+ 
+ volume_chand_ha <- function(data) {
+   data<-data %>%
+     mutate(
+       vol_chandelle_ha = vol_chandelle_ind * den_new
+     ) 
+ }
+
+
+ ## 1.4.3.1.3  Calcul du volume total de BMD à l'ha pour toutes les placettes ( BMD tot m3/ha) ##
+ 
+ volume_chand_tot <- function(data) {
+   data<-data %>%
+     group_by(placette) %>%
+     mutate(vol_chandelle_tot = sum(vol_chandelle_ha, na.rm = TRUE)) %>%  
+     ungroup()  
+ }
+ 
+}
 
 
  ### 1.5. DENDROMICROHABITATS ###
@@ -679,6 +705,11 @@ if(TRUE) {
 
 }
 
+ 
+ 
+ 
+
+ 
    ## 1.5.2. Densité de DMH / ha ##
 
 if(TRUE) {
@@ -702,7 +733,7 @@ if(TRUE) {
       return(data)
     }
    
-    
+    test <- densite_dmh_parcelle(data_dmh)
 
 
     ## 1.5.2.2. Calcul du nombre de DMH par hectare (densité par ha)
@@ -789,8 +820,13 @@ if(TRUE) {
              -total_DMH, 
              -code.DMH,
              -decompo,
-             -forme,
-             -type.objet
+             -Nom_essence,
+             -Typologie,
+             -classe_bois,
+             -stade.decomp,
+             -type.objet,
+             -vol_chandelle_ind,
+             -vol_chandelle_ha
              )
     
     return(data)
@@ -864,6 +900,9 @@ ff_dmh <- function(data) {
   data <- volume_BMS_ind(data)         # Applique la fonction volume_BMS_ind
   data <- volume_BMS_ha(data)          # Applique la fonction volume_BMS_ha
   data <- volume_BMS_tot(data)         # Applique la fonction volume_BMS_tot
+  data <- volume_chand_ind(data)
+  data <- volume_chand_ha(data)
+  data <- volume_chand_tot(data)
   data <- volume_BM_tot(data)          # Applique la fonction volume_BM_tot
   data <- diversite_dmh (data)
   data <- densite_dmh_parcelle (data)
@@ -886,7 +925,7 @@ write.xlsx(dmh_filtered, file = file_output_dmh)
 
 }
 
-
+ 
 #### 2. JEU COUVERT ####
 
 
@@ -1241,10 +1280,10 @@ if(TRUE) {
   #et en "double" dans l'autre ce qui empêche la fusion. Ainsi, nous les convertissons
   #toutes les deux en numérique.
   
-  couvert_filtered$placette <- as.numeric(couvert_filtered$placette)
-  dmh_filtered$placette <- as.numeric(dmh_filtered$placette)
-  couvert_dmh_merged <- left_join(couvert_filtered, dmh_filtered, by = "placette")
-  write.xlsx(couvert_dmh_merged, file = file_output_merged)
+  ventoux_couvert_filtered$placette <- as.numeric(ventoux_couvert_filtered$placette)
+  ventoux_dmh_filtered$placette <- as.numeric(ventoux_dmh_filtered$placette)
+  ventoux_couvert_dmh_merged <- left_join(ventoux_couvert_filtered, ventoux_dmh_filtered, by = "placette")
+  write.xlsx(ventoux_couvert_dmh_merged, file = file_output_merged)
   
 }
 
@@ -1680,6 +1719,9 @@ if (TRUE) {
              -nom_vernaculaire,
              -Nidification,
              -alimentation,
+             -rs_NA.x,
+             -rs_NA.y,
+             -rs_Aerial,
              -specialisation)
     return(data)
   }
@@ -1733,7 +1775,7 @@ if(TRUE) {
  
  
 
-     #### 5. BD FINALE (1) ####
+   #### 5. BD FINALE (1) ####
  
         ### 5.1. Définition des paramètres de sortie ###
 
@@ -1755,13 +1797,13 @@ if(TRUE) {
 
 if(TRUE) {
   
-  BD1 <- left_join(bird_filtered, couvert_dmh_merged, by = "placette")
+  BD1 <- left_join(bird_filtered, ventoux_couvert_dmh_merged, by = "placette")
   write.xlsx(BD1, file = file_output_merged_BD1)
   
 }
 
 
-   #### 6. BD FINALE (1) ####
+   #### 6. BD FINALE (2) ####
  
     ### 6.1. Définition des paramètres de sortie ###
 
@@ -1799,9 +1841,19 @@ if(TRUE) {
 #AU CAS OU
 
 
-#------------------------------------
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ ####AU CAS OU ####
+ 
+
 #SURFACE TERRIERE
-#-----------------------------------
+
 
 #Fonction pour calculer la surface terrière par essence et pour chaque individu
 
@@ -2059,7 +2111,7 @@ data <- data %>%
   ))
 
 return(data)
-}
+
  
 
 #JEU COUVERT
@@ -2128,3 +2180,41 @@ essence <- function(data) {
   return(data)
 }
 
+
+
+
+
+
+diversite_dmh <- function(data) {
+  # Séparer les codes de DMH en lignes distinctes pour chaque arbre
+  data_separee <- data %>%
+    separate_rows(code.DMH, sep = ",") %>%
+    mutate(code.DMH = str_trim(code.DMH)) %>%
+    
+    # Créer une nouvelle colonne combinant l'essence, le type de bois et le type de DMH
+    mutate(type_complet = paste(Nom_essence, Typologie, code.DMH, sep = " - ")) %>%
+    
+    # Compter le nombre d'occurrences de chaque type complet par placette, tout en gardant 'code.DMH'
+    count(placette, type_complet, code.DMH) %>%
+    
+    # Calculer la proportion de chaque type complet par placette
+    group_by(placette) %>%
+    mutate(proportion = n / sum(n)) %>%
+    ungroup() %>%
+    
+    # Calcul de l'indice de Shannon pour chaque placette
+    group_by(placette) %>%
+    summarise(
+      diversite_DMH = ifelse(sum(!is.na(code.DMH)) == 0, NA, -sum(proportion * log2(proportion), na.rm = TRUE))
+    ) %>%
+    ungroup()
+  
+  # Ajouter l'indice de Shannon calculé à l'ensemble du jeu de données initial
+  data <- data %>%
+    left_join(data_separee, by = "placette")
+  
+  return(data)
+}
+
+
+test3 <- diversite_dmh (test)

@@ -33,17 +33,14 @@ if(TRUE) {
   #Une matrice de corrélation est réalisée pour voir si des variables ont des corrélations supérieures à 0.8
   #entre elles. A ce compte là; simplement une variable sur les deux seraient gardées selon la littérature.
   
-  #Dans notre cas, aucune variable n'est réellement corrélée, le maximum étant à 0.7
   
   
-  cor_matrix <- cor(ventoux_BD1[, c("strate_h","strat_sa","strat_a","strat_A",
-                                    "densite_canopy","densite_GBV","densite_GBM","densite_BV","densite_BMS",
-                                    "densite_BMD","vol_BMS_tot", "vol_BMD_tot","vol_BM_tot","diversite_DMH",
-                                    "densite_dmh_ha","decompo_moyen")],use="complete.obs")
   
-  #Fonction permettant de voir le nombre de corrélation > 0.8 (/!\ CHIFFRE A VERIFIER /!\)
+  cor_matrix <- cor(ventoux_BD1[, c("rs_Cavicole", "strate_h","strat_sa","strat_a","strat_A", "densite_GBM",
+                                    "densite_canopy","densite_GBV", "densite_BMS", "vol_BM_tot", "pct_st_Conifère",
+                                     "vol_BMD_tot","diversite_DMH", "densite_BV","pct_st_Feuillu", "vol_BMS_tot",
+                                    "densite_dmh_ha","decompo_moyen","vol_chandelle_tot","densite_souche")],use="complete.obs")
   
-  cor_matrix[upper.tri(cor_matrix, diag = FALSE) & abs(cor_matrix) > 0.75]
   
   # Visualisation de la matrice
 
@@ -52,11 +49,14 @@ corrplot(cor_matrix, method = "color", type = "upper",
          tl.cex = 0.9, tl.col = "black", addCoef.col = "black",
          col = colormap, cl.cex = 0.9, number.cex = 0.7, 
          insig = "blank", diag = FALSE)
-
+#Il y a de nombreuses corrélation dans cette matrice, il va donc falloir éliminer des variables afin de
+#sélectionner celles qui semblent le plus pertinentes dans le cadre de notre étude ou bien, toutes les 
+#conserver mais bien veiller à ne pas toutes les mettre dans le même modèle !! 
 }
 
- #### 2. Recherche des outliers et des intéractions potentielles entre variables par visualisation 
-        #graphique (method = "lm") ####
+
+
+#### 2. Recherche des outliers et des intéractions potentielles entre variables par visualisation graphique (method = "lm") ####
 
 
  ### 2.1. Guildes et variables liées au bois mort ###
@@ -868,10 +868,60 @@ if(TRUE) {
 
 
 
-   #### 3. Modélisation ####
+#### 3. Modélisation ####
+
+if(TRUE) {
+  
+### 3.1. Modélisation rs_cavicole ###
 
 
-   #### 4. Visualisation graphique variable réponse/variable explicative ayant un effet ####
+  ## 3.1.1. Histogramme de la distribution de la variable réponse
+  
+  
+  
+  #On trace l'histogramme de la distribution de la variable réponse afin de voir si elle suit une distribution
+  #normale. Dans notre cas, la distribution est plutot jolie.
+  
+
+hist(ventoux_BD1$rs_Cavicole,
+     main="Histogramme de la variable rs_cavicole (réponse)",
+     xlab="rs_cavi",
+     col="lightblue",
+     breaks=20)
+
+  
+  model_nul <- glm(rs_Cavicole ~ 1,
+                   family=poisson, data = ventoux_BD1)
+  
+  
+  
+cavi1 <- glm(rs_Cavicole ~ densite_BV + vol_BM_tot + densite_dmh_ha + diversite_DMH
+             + decompo_moyen + pct_st_Conifère + densite_souche + densite_BM_tot,
+                family = poisson,data = ventoux_BD1)
+
+summary(cavi1)
+
+
+AIC(cavi1)
+AIC(model_nul)
+
+
+summary(cavi1)
+
+
+
+vif(cavi1)
+
+mod_test <- glm(rs_Cavicole ~ densite_GBV + densite_BV + vol_BMS_tot + vol_BMD_tot + densite_souche +
+                   densite_A + vol_chandelle_tot + diversite_DMH + densite_dmh_ha + decompo_moyen +
+                  forme +  pct_st_Feuillu + strate_h + strat_sa + strat_a + strat_A + densite_canopy,
+                data = ventoux_BD1, family = poisson)
+
+alias(mod_test)
+
+
+}
+#### 4. Visualisation graphique variable réponse/variable explicative ayant un effet ####
 
 
 
@@ -902,7 +952,7 @@ if(TRUE) {
   }
   
   # Exemple d'application à un jeu de données
-  ventoux_BD_nid <- ventoux_BD_nid %>%
+  ventoux_BD_nid <- ventoux_BD1 %>%
     mutate(classes_bm1 = classes_densite_bm(densite_BM_tot))
   
   # Réordonne les niveaux du facteur pour garantir l'ordre souhaité
@@ -1309,4 +1359,9 @@ if(TRUE) {
           axis.text.x = element_text(angle = 40, hjust = 1)) 
   
 }
+
+
+
+
+
 

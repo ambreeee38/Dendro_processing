@@ -10,6 +10,7 @@ library(viridis)
 library(corrplot)
 library(gridExtra)
 library(patchwork)
+library(lme4)
 
 #### 2. Configuration du chemin de direction ####
 if(FALSE){
