@@ -37,9 +37,12 @@ if(TRUE) {
   
   
   cor_matrix <- cor(ventoux_BD1[, c("rs_Cavicole", "strate_h","strat_sa","strat_a","strat_A", "densite_GBM",
-                                    "densite_canopy","densite_GBV", "densite_BMS", "vol_BM_tot", "pct_st_Conifère",
-                                     "vol_BMD_tot","diversite_DMH", "densite_BV","pct_st_Feuillu", "vol_BMS_tot",
-                                    "densite_dmh_ha","decompo_moyen","vol_chandelle_tot","densite_souche")],use="complete.obs")
+                                    "densite_GBV", "densite_BMS","densite_BV","densite_canopy","densite_souche",
+                                    "densite_dmh_ha", 
+                                    "diversite_DMH" ,"vol_BM_tot", "vol_BMD_tot","vol_BMS_tot","vol_chandelle_tot","pct_st_Conifère",
+                                     "pct_st_Feuillu", 
+                                    "decompo_moyen", "alt", "expo",
+                                    "pente")],use="complete.obs")
   
   
   # Visualisation de la matrice
@@ -870,10 +873,130 @@ if(TRUE) {
 
 #### 3. Modélisation ####
 
+
+### 3.1. Modélisation rs_globale ###
+
+#Modèle nul
+
+summary(model_nul <- glm(rs_tot ~ 1,
+                 family=poisson, data = ventoux_BD1))
+
+
+
+
+    # (i) La richesse spécifique totale est plus importante dans une forêt à composition mixte
+    
+if(TRUE) {   
+  
+ 
+
+   summary(tot1 <- glm(rs_tot ~ type_foret*alt,
+                family=negative.binomial, data=ventoux_BD1))
+    
+  phi1 <- summary(tot1)negative.binomial()phi1 <- summary(tot1)$deviance / summary(tot1)$df.residual #phi = 0.61
+  
+  
+    # Extraire les coefficients du modèle GLM
+    coefficients_df <- summary(tot1)$coefficients
+    
+    # Convertir en data.frame et ajouter les noms de lignes en tant que colonne
+    coefficients_df <- as.data.frame(coefficients_df)
+    coefficients_df <- coefficients_df %>%
+      rownames_to_column("Term")
+    
+    # Renommer les termes pour "Feuillu", "Conifère", et "Mixte"
+    coefficients_df <- coefficients_df %>%
+      mutate(Term = gsub("type_foretfeuillu", "Feuillu", Term),
+             Term = gsub("type_foretconifere", "Conifère", Term),
+             Term = gsub("type_foretmixte", "Mixte", Term))
+    
+    # Créer une jolie table avec kableExtra
+    coefficients_df %>%
+      kable("html", caption = "Coefficients du modèle GLM (Poisson) pour rs_tot selon le type de forêt") %>%
+      kable_styling(bootstrap_options = c("striped", "hover", "responsive")) %>%
+      column_spec(1, bold = TRUE) %>%  # Mettre la colonne des termes en gras
+      column_spec(2, width = "4cm") %>%
+      column_spec(3, width = "4cm") %>%
+      column_spec(4, width = "4cm") %>%
+      # Mettre les p-values en gras
+      column_spec(5, bold = TRUE, color = "black") %>%
+      add_header_above(c("Term", "Estimate", "Std. Error", "z value", "Pr(>|z|)"))  # Pas de duplication des en-têtes
+    
+    
+}
+
+ #(ii) La richesse spécifique totale est plus importante avec la densité de Gros Bois Vivant
+
 if(TRUE) {
   
-### 3.1. Modélisation rs_cavicole ###
+  summary(tot2 <- glm(rs_tot ~ densite_GBV,
+                      family=poisson, data=ventoux_BD1))
+  
+  phi2 <- summary(tot2)$deviance / summary(tot2)$df.residual #phi = 0.62
+}
 
+ # (iii) La richesse spécifique totale diminue avec une forte densité d'arbres vivants
+
+if(TRUE) {
+  
+  summary(tot3 <- glm(rs_tot ~ densite_BV,
+                      family=poisson, data=ventoux_BD1))
+  
+  phi3 <- summary(tot3)$deviance / summary(tot3)$df.residual #phi = 0.58
+}
+
+# (iv) La richesse spécifique totale diminue avec une forte densité de souches
+
+if(TRUE) {
+  
+  summary(tot4 <- glm(rs_tot ~ densite_souche,
+                      family=poisson, data=ventoux_BD1))
+  
+  phi4 <- summary(tot4)$deviance / summary(tot4)$df.residual #phi = 0.62
+}
+
+# (v) La richesse spécifique totale varie selon le type d'exploitation
+
+if(TRUE) {
+  
+  summary(tot5 <- glm(rs_tot ~ forme,
+                      family=poisson, data=ventoux_BD1))
+  
+  phi5 <- summary(tot5)$deviance / summary(tot5)$df.residual #phi = 0.52
+}
+
+
+# (vi) La richesse spécifique totale augmente lorsqu'il y a une grande richesse spécifique arborée
+
+if(TRUE) {
+  
+  summary(tot6 <- glm(rs_tot ~ richesse_spe_arbre,
+                      family=poisson, data=ventoux_BD1))
+  
+  phi6 <- summary(tot6)$deviance / summary(tot6)$df.residual #phi = 0.63
+}
+
+
+# (vii) Test modèle global
+
+if(TRUE) {
+  
+  summary(tot7 <- glm(rs_tot ~ type_foret*alt + densite_BV ,
+                       family=poisson,data= ventoux_BD1))
+  AICc(tot7,tot6,tot5,tot4, tot3, tot2, tot1, model_nul)
+  
+  
+  
+  phi7 <- summary(tot7)$deviance / summary(tot7)$df.residual #phi = 0.52
+  
+  plot(x=fitted(tot7), y=sqrt(abs(residuals(tot7))))
+  
+  
+}
+
+  ### 3.2. Modélisation rs_cavicole ###
+
+if(TRUE) {
 
   ## 3.1.1. Histogramme de la distribution de la variable réponse
   
@@ -889,14 +1012,15 @@ hist(ventoux_BD1$rs_Cavicole,
      col="lightblue",
      breaks=20)
 
+  hist(ventoux_BD1$rs_tot)
+  
   
   model_nul <- glm(rs_Cavicole ~ 1,
                    family=poisson, data = ventoux_BD1)
   
   
   
-cavi1 <- glm(rs_Cavicole ~ densite_BV + vol_BM_tot + densite_dmh_ha + diversite_DMH
-             + decompo_moyen + pct_st_Conifère + densite_souche + densite_BM_tot,
+cavi1 <- glm(rs_Cavicole ~  vol_BM_tot,
                 family = poisson,data = ventoux_BD1)
 
 summary(cavi1)
@@ -921,6 +1045,7 @@ alias(mod_test)
 
 
 }
+
 #### 4. Visualisation graphique variable réponse/variable explicative ayant un effet ####
 
 

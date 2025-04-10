@@ -38,7 +38,10 @@ if(TRUE) {
   file_data_dmh <-read_excel(file.path(Input_dmh_case_file, "Saisie_DMH_2024_corrige.xlsx"), sheet = "Data")
   file_data_forme_forestiere<-file.path(Input_dmh_case_file, "forme_forestiere.xlsx")
   file_data_CodEss <- file.path (Input_dmh_case_file, "CodESS.xlsx")
-  
+  file_data_alt <- file.path (Input_dmh_case_file, "alt.xlsx")
+  file_data_topo <- file.path (Input_dmh_case_file, "topo.xlsx")
+  file_data_pente <- file.path (Input_dmh_case_file, "pente.xlsx")
+  file_data_expo <- file.path (Input_dmh_case_file, "expo.xlsx")
   
   ## SORTIE
   
@@ -53,6 +56,10 @@ if(TRUE) {
   ## LECTURE DES JEUX DE DONNEES DANS L'ENVIRONNEMENT (file_data_dmh est déja chargé dans les lignes supérieures)
   forme_forestiere = read_excel(file_data_forme_forestiere) 
   CodEss = read_excel (file_data_CodEss)
+  alt = read_excel (file_data_alt)
+  topo = read_excel (file_data_topo)
+  pente = read_excel (file_data_pente)
+  expo = read_excel (file_data_expo)
   data_dmh<-file_data_dmh
   
   
@@ -705,11 +712,6 @@ if(TRUE) {
 
 }
 
- 
- 
- 
-
- 
    ## 1.5.2. Densité de DMH / ha ##
 
 if(TRUE) {
@@ -725,15 +727,16 @@ if(TRUE) {
   #calculer le nombre total de DMH sur la parcelle.
   
   densite_dmh_parcelle <- function(data) {
-      data <- data %>%  
-        group_by(placette) %>%  
-        mutate(total_DMH = n()) %>%  
-        ungroup()  
-      
-      return(data)
-    }
-   
-    test <- densite_dmh_parcelle(data_dmh)
+    data <- data %>%
+      mutate(nb_DMH_ligne = ifelse(is.na(code.DMH), 0,
+                                   str_count(code.DMH, "-") + 1)) %>%  # compte les DMH dans chaque ligne
+      group_by(placette) %>%
+      mutate(nb_DMH = sum(nb_DMH_ligne)) %>%
+      ungroup()
+    
+    return(data)
+  }
+  
 
 
     ## 1.5.2.2. Calcul du nombre de DMH par hectare (densité par ha)
@@ -741,15 +744,13 @@ if(TRUE) {
 densite_dmh_ha <-function (data) {
   data <- data %>%
     group_by(placette) %>%
-    mutate (densite_dmh_ha = total_DMH/0.1257)%>%
+    mutate (densite_dmh_ha = nb_DMH/0.1257)%>%
     ungroup()
   
   return(data)
 }
 
 }
-
-
 
   ### 1.6. TAUX DE DECOMPOSITION MOYEN ###
 
@@ -785,19 +786,186 @@ if(TRUE) {
     
     return(data)
   }
-  test<-decompo(data_dmh)
+ 
   
 }
+ 
+ ### 1.7. ALTITUDE ###
+ 
+ 
+ if(TRUE){
+   
+   #Dans les metadonnées, on dispose de l'altitude des placettes. Le but est de les fusionner avec le 
+   #jeu de données DMH par placette.
+   
+   #Dans Excel, un nouveau jeu de données nommé "alt" est crée en copiant
+   #les colonnes "placette" et "forme" des métadonnées. La fonction ci-dessous permet 
+   #merge ce dataframe au jeu de données initial "Saisie_DMH_2024"et ce, par placette.
+   
+   #On met les colonnes placettes au format "character" car il arrive que les colonnes
+   #placettes soient au format numérique dans un jeu de données et au format character
+   #dans l'autre. En faisant ça, on empêche les erreurs de jointure.
+   
+   #La fonction left_join est issue du package dplyr et permet de réaliser une jointure
+   #dite "gauche". Toutes les lignes du jeux de données sont conservées 
+   #et uniquement les colonnes de "forme_forestiere" seront ajoutées au jeu de données
+   #initial s'il y a une correspondance.
+   
+   
+   
+   merge_altitude <- function(data) {
+     data <- data %>%
+       mutate(placette = as.character(placette))
+     alt <- alt %>%
+       mutate(placette = as.character(placette))
+     data <- data %>%
+       left_join(alt, by = "placette")
+     
+     return(data)
+   }
+ }
+ test <- merge_altitude (data_dmh)
+ ### 1.8. TOPOGRAPHIE ###
+ 
+ if(TRUE){
+   
+   #Dans les metadonnées, on dispose de la topographie des placettes. Le but est de les fusionner avec le 
+   #jeu de données DMH par placette.
+   
+   #Dans Excel, un nouveau jeu de données nommé "topo" est crée en copiant
+   #les colonnes "placette" et "topo" des métadonnées. La fonction ci-dessous permet 
+   #merge ce dataframe au jeu de données initial "Saisie_DMH_2024"et ce, par placette.
+   
+   #On met les colonnes placettes au format "character" car il arrive que les colonnes
+   #placettes soient au format numérique dans un jeu de données et au format character
+   #dans l'autre. En faisant ça, on empêche les erreurs de jointure.
+   
+   #La fonction left_join est issue du package dplyr et permet de réaliser une jointure
+   #dite "gauche". Toutes les lignes du jeux de données sont conservées 
+   #et uniquement les colonnes de "forme_forestiere" seront ajoutées au jeu de données
+   #initial s'il y a une correspondance.
+   
+   
+   
+   merge_topo<- function(data) {
+     data <- data %>%
+       mutate(placette = as.character(placette))
+     topo <- topo %>%
+       mutate(placette = as.character(placette))
+     data <- data %>%
+       left_join(topo, by = "placette")
+     
+     return(data)
+   }
+  
 
-   ### 1.7. NETTOYAGE JEU DE DONNEES ###
+   
+   #Cette fonction permet de convertir les 1,2,3.. par leur typologie associée afin d'avoir
+   #plus de clarté dans le jeu de données et pas uniquement des chiffres qui peuvent
+   #paraitre abstrait si l'on a pas la classification utilisée en tête.
+   
+   #Ici mutate permet de modifier la colonne "topo" en character et remplace les chiffres
+   #par leur correspondance textuelle.
+   
+   
+   forme_topo<- function(data) {
+     data <- data %>%
+       mutate(
+         topo = case_when(
+           topographie == 1 ~ "Terrain plat",
+           topographie == 2 ~ "Sommet",
+           topographie == 3 ~ "Haut versant",
+           topographie == 4 ~ "Bas versant",
+           topographie == 5 ~ "Mi versant",
+           topographie == 6 ~ "Depression ouverte",
+           topographie == 7 ~ "Depression fermee",
+           TRUE ~ as.character(topographie)  # Conserve les valeurs existantes si elles ne sont pas 1 à 6
+         )
+       )
+     return(data)
+   }
+ 
+ }
+ 
+ ### 1.9. PENTE ###
+ 
+ if(TRUE){
+   
+   #Dans les metadonnées, on dispose de la pente des placettes. Le but est de les fusionner avec le 
+   #jeu de données DMH par placette.
+   
+   #Dans Excel, un nouveau jeu de données nommé "pente" est crée en copiant
+   #les colonnes "placette" et "pente" des métadonnées. La fonction ci-dessous permet 
+   #merge ce dataframe au jeu de données initial "Saisie_DMH_2024"et ce, par placette.
+   
+   #On met les colonnes placettes au format "character" car il arrive que les colonnes
+   #placettes soient au format numérique dans un jeu de données et au format character
+   #dans l'autre. En faisant ça, on empêche les erreurs de jointure.
+   
+   #La fonction left_join est issue du package dplyr et permet de réaliser une jointure
+   #dite "gauche". Toutes les lignes du jeux de données sont conservées 
+   #et uniquement les colonnes de "forme_forestiere" seront ajoutées au jeu de données
+   #initial s'il y a une correspondance.
+   
+   
+   
+   merge_pente<- function(data) {
+     data <- data %>%
+       mutate(placette = as.character(placette))
+     pente <- pente %>%
+       mutate(placette = as.character(placette))
+     data <- data %>%
+       left_join(pente, by = "placette")
+     
+     return(data)
+   }
+   
+ }
+ 
+ ### 1.10. EXPOSITION ###
+ 
+ if(TRUE){
+   
+   #Dans les metadonnées, on dispose de l'exposition des placettes. Le but est de les fusionner avec le 
+   #jeu de données DMH par placette.
+   
+   #Dans Excel, un nouveau jeu de données nommé "exposition" est crée en copiant
+   #les colonnes "placette" et "exposition" des métadonnées. La fonction ci-dessous permet 
+   #merge ce dataframe au jeu de données initial "Saisie_DMH_2024"et ce, par placette.
+   
+   #On met les colonnes placettes au format "character" car il arrive que les colonnes
+   #placettes soient au format numérique dans un jeu de données et au format character
+   #dans l'autre. En faisant ça, on empêche les erreurs de jointure.
+   
+   #La fonction left_join est issue du package dplyr et permet de réaliser une jointure
+   #dite "gauche". Toutes les lignes du jeux de données sont conservées 
+   #et uniquement les colonnes de "forme_forestiere" seront ajoutées au jeu de données
+   #initial s'il y a une correspondance.
+   
+   
+   
+   merge_expo<- function(data) {
+     data <- data %>%
+       mutate(placette = as.character(placette))
+     expo <- expo %>%
+       mutate(placette = as.character(placette))
+     data <- data %>%
+       left_join(expo, by = "placette")
+     
+     return(data)
+   }
+   
+ }
+
+   ### 1.11. NETTOYAGE JEU DE DONNEES ###
 
 if(TRUE) {
   
-    ## 1.7.1. Suppression des colonnes qui ne sont plus indispensables dans l'analyse de données ##
+    ## 1.11.1. Suppression des colonnes qui ne sont plus indispensables dans l'analyse de données ##
   
   nettoyage <- function(data){
     data <- data %>%
-      select(-arbre, 
+      dplyr::select (-arbre, 
              -Code, 
              -diam, 
              -`longueur / hauteur`,   
@@ -817,7 +985,8 @@ if(TRUE) {
              -vol_BMD_ha, 
              -vol_BMS_ind, 
              -vol_BMS_ha, 
-             -total_DMH, 
+             -nb_DMH_ligne,
+             -nb_DMH,
              -code.DMH,
              -decompo,
              -Nom_essence,
@@ -826,6 +995,7 @@ if(TRUE) {
              -stade.decomp,
              -type.objet,
              -vol_chandelle_ind,
+             -topographie,
              -vol_chandelle_ha
              )
     
@@ -861,13 +1031,10 @@ if(TRUE) {
     return(data)
   }
   
-  
-  
-  
-  
+
 }
 
-   ### 1.8. FONCTION FINALE POUR CALCULER VARIABLES STUCTURELLES ###
+   ### 1.12. FONCTION FINALE POUR CALCULER VARIABLES STUCTURELLES ###
 
 if(TRUE) {
 
@@ -879,10 +1046,15 @@ if(TRUE) {
 
 
 ff_dmh <- function(data) {
-  data<-merge_forme_forestiere(data)
-  data<-forme_foret(data)
-  data<-Typologie_essence_code(data)
+  data <-merge_forme_forestiere(data)
+  data <-forme_foret(data)
+  data <-Typologie_essence_code(data)
   data <- Typologie_essence(data)           # Applique la fonction culture_foret
+  data <- merge_altitude(data)
+  data <- merge_topo(data)
+  data <- forme_topo (data)
+  data <- merge_pente(data)
+  data <- merge_expo(data)
   data <- classer_bois(data)           # Applique la fonction classer_bois
   data <- GBV(data)                    # Applique la fonction GBV
   data <- GBM(data)                    # Applique la fonction GBM
@@ -908,13 +1080,11 @@ ff_dmh <- function(data) {
   data <- densite_dmh_parcelle (data)
   data <- densite_dmh_ha (data)
   data <- decompo (data)
-  data <- ligne (data)
   data <- nettoyage (data)
-  
-  
-
+  data <- ligne (data)
   return(data)
 }
+
 
 
   ## 1.7.1. Application de la fonction finale au jeu de données initial et enregistrement
@@ -924,7 +1094,7 @@ write.xlsx(dmh_filtered, file = file_output_dmh)
 
 
 }
-
+ 
  
 #### 2. JEU COUVERT ####
 
@@ -1090,21 +1260,46 @@ if(TRUE) {
   st_cf <- function(data) {
     data <- data %>%
       mutate(N = as.numeric(N))
+    
     st_data <- data %>%
       group_by(placette, Typologie) %>%
       summarise(surface_terriere = sum(N, na.rm = TRUE), .groups = "drop") %>%
-      pivot_wider(names_from = Typologie, values_from = surface_terriere, names_prefix = "st_")
-    st_data <- st_data %>%
-      mutate(across(starts_with("st_"), ~ replace_na(., 0)))  
-    st_data <- st_data %>%
-      mutate(st_total = rowSums(across(starts_with("st_")), na.rm = TRUE))  
-    st_data <- st_data %>%
+      pivot_wider(names_from = Typologie, values_from = surface_terriere, names_prefix = "st_") %>%
+      mutate(across(starts_with("st_"), ~ replace_na(., 0))) %>%
+      mutate(st_total = rowSums(across(starts_with("st_")), na.rm = TRUE)) %>%
       mutate(across(starts_with("st_"), ~ round((. / st_total) * 100, 1), .names = "pct_{.col}"))
-    data <- left_join(data, st_data, by = "placette")
+    
+    # Calcul des richesses spécifiques
+    rs_data <- data %>%
+      group_by(placette) %>%
+      summarise(
+        rs_feuillu = n_distinct(Nom_essence[Typologie == "Feuillu" & !is.na(Nom_essence)]),
+        rs_conifere = n_distinct(Nom_essence[Typologie == "Conifère" & !is.na(Nom_essence)])
+      )
+    
+    data <- data %>%
+      left_join(st_data, by = "placette") %>%
+      left_join(rs_data, by = "placette")
     
     return(data)
   }
   
+  
+  
+  #Création d'une colonne déterminant le type de forêt (feuillu, mixte ou conifère). D'après l'IGN forestier,
+  #Les forêts sont considérées comme "pures" dès lors que la présence d'un type (conifère ou feuillu) est 
+  # > 75%. Le reste est considéré comme forêt mixte.
+  
+
+  
+  typo_foret <- function(data) {
+  data <- data %>%
+    mutate(type_foret = case_when(
+      pct_st_Conifère > 75 ~ "conifère",
+      pct_st_Feuillu > 75 ~ "feuillu",
+      TRUE ~ "mixte"
+    ))
+  }
   
 }
 
@@ -1126,27 +1321,30 @@ if(TRUE) {
    
    canopy <- function(data) {
      data <- data %>%
-       mutate(can_moy = rowMeans(select(., No, Su, Es, Ou), na.rm = TRUE)) %>%
-       ungroup()  
-     data <- data %>%
-       group_by(placette) %>%  
+       mutate(can_moy = rowMeans(across(c(No, Su, Es, Ou)), na.rm = TRUE)) %>%
+       ungroup() %>%
+       group_by(placette) %>%
        mutate(densite_canopy = 1.04 * mean(can_moy, na.rm = TRUE)) %>%
-       ungroup() 
+       ungroup()
+     
      return(data)
    }
+   
  }
 
 
 
 
    ### 2.5. CALCUL DE LA RICHESSE SPECIFIQUE ### 
+ 
+     ## 2.5.1. Richesse spécifique totale ##
 
 if(TRUE) {
   
   richesse_spe <- function(data) {
     data %>%
       group_by(placette) %>%           
-      mutate(richesse_spe = n_distinct(Nom_essence)) %>%  
+      mutate(richesse_spe_arbre = n_distinct(Nom_essence)) %>%  
       ungroup()                             
     
   }
@@ -1174,7 +1372,7 @@ if (TRUE) {
     data <- data %>%
       mutate(observateur = apply(., 1, function(x) paste(na.omit(x[c("Eq1", "Eq2", "Eq3", "Eq4")]), collapse = " ")))
     data <- data %>%
-      select(-a, 
+      dplyr :: select(-a, 
              -b, 
              -c, 
              -d, 
@@ -1237,6 +1435,7 @@ if(TRUE) {
     data<-Typologie_essence_2(data)
     data<-colonnes_strates(data)
     data<- st_cf(data)
+    data<- typo_foret(data)
     data<-canopy (data)
     data<-richesse_spe(data)
     data<-bd_couvert_propre(data)
@@ -1251,7 +1450,7 @@ if(TRUE) {
   write.xlsx(couvert_filtered, file = file_output_couvert)
   
 }
-
+ 
  
 #### 3. FUSION DES JEUX DE DONNEES COUVERT ET DMH ####
 
@@ -1280,9 +1479,9 @@ if(TRUE) {
   #et en "double" dans l'autre ce qui empêche la fusion. Ainsi, nous les convertissons
   #toutes les deux en numérique.
   
-  ventoux_couvert_filtered$placette <- as.numeric(ventoux_couvert_filtered$placette)
-  ventoux_dmh_filtered$placette <- as.numeric(ventoux_dmh_filtered$placette)
-  ventoux_couvert_dmh_merged <- left_join(ventoux_couvert_filtered, ventoux_dmh_filtered, by = "placette")
+  couvert_filtered$placette <- as.numeric(couvert_filtered$placette)
+  dmh_filtered$placette <- as.numeric(dmh_filtered$placette)
+  ventoux_couvert_dmh_merged <- left_join(couvert_filtered, dmh_filtered, by = "placette")
   write.xlsx(ventoux_couvert_dmh_merged, file = file_output_merged)
   
 }
@@ -1315,7 +1514,8 @@ if(TRUE) {
   file_data_sites_sp<-file.path(Input_bird_case_file, "sites_sp.xlsx")
   file_data_code_latin<-file.path(Input_bird_case_file, "code_latin.xlsx")
   file_data_bird <-read_excel(file.path(Input_bird_case_file, "Saisie_oiseaux_2024.xlsx"), sheet = "DATA")
-  file_data_spe <- file.path(Input_bird_case_file, "spec_test.xlsx")
+  file_data_spe <- file.path(Input_bird_case_file, "specialisation.xlsx")
+  
   data_bird<- file_data_bird
   
   ## SORTIE
@@ -1349,6 +1549,11 @@ if(TRUE) {
   #nom latin.
   
   code_stoc_latin = read_excel (file_data_code_latin)
+  
+  #Chargement du jeu de données associant la spécialisation des espèces à leur
+  #nom latin.
+  
+  specialisation = read_excel (file_data_spe)
 
 }
 
@@ -1429,7 +1634,7 @@ if(TRUE) {
   }
 
 
-  ## 4.1.3.1. Ajout des guildes d'alimentation et de spécialisation ##
+  ## 4.1.3.2. Ajout des guildes d'alimentation ##
   
   #Pour l'alimentation, 3 classification ont été créées : Omnivore, herbivore
   #et insectivore. 
@@ -1445,27 +1650,32 @@ if(TRUE) {
   #dont le régime alimentaire est composé à au moins 70% des produits associés.
   #(d'après Avonet).
   
-  #Pour la spécialisation, il y a au total 3 grandes guildes tirées d'Avonet :
   
-                  #Generalist : Espèces n'ayant pas de lifestyle particulier
-                  #            passant d'un lifestyle à l'autre
-  
-                  #Insessorial : Espèces passant la majeure partie de leur temps
-                  #              au-dessus du sol(branches des arbres, des arbustes
-                  #              ou sur des rochers)
-   
-                  #Terrestrial : Espèces passant la majeure partie de leur vie 
-                  #              au sol
-  
-  
-  merge_guilde_alim_spe <- function (data) {
+  merge_guilde_alim<- function (data) {
     data <-data%>%
       left_join(avonet, by = "sp_latin") %>%
       return (data)
   }
+
+  
+
+ ## 4.1.3.3. Ajout des guildes de spécialisation ##
+ 
+ 
+ #Pour la spécialisation, il y a au total 2 grandes guildes tirées de Bouvet & al (2016) :
+ 
+ # (i) Spécialistes forestières : Espèces inféodée au milieu forestier
+ 
+
+ # (ii) Généralistes : Espèces n'ayant pas de lifestyle particulièrement lié au milieu forestier
+ 
+ 
+  merge_guilde_spe<- function (data) {
+    data <-data%>%
+      left_join(specialisation, by = "sp_latin") %>%
+      return (data)
+  }
 }
-
-
 
   ### 4.2. CALCUL DE L'ABONDANCE PAR GUILDE ###
 
@@ -1559,46 +1769,26 @@ if (TRUE) {
 
    ## 4.2.3. Spécialisation ##
 
-if(TRUE) {
+ ab_gen <- function(data) {
+   data<-data %>%
+     group_by(placette) %>%           
+     mutate(ab_gen = sum(specialisation == "G", na.rm = TRUE)) %>% 
+     ungroup()
+   
+   return(data)
+   
+ }
+ 
+   ab_specialist <- function(data) {
+     data<-data %>%
+       group_by(placette) %>%           
+       mutate(ab_specialist = sum(specialisation == "F", na.rm = TRUE)) %>% 
+       ungroup()
+     
+     return(data)
   
-    # 4.2.3.1. Généralistes
-  
-  ab_gen <- function(data) {
-    data<-data %>%
-      group_by(placette) %>%           
-      mutate(ab_gen = sum(specialisation == "Generalist", na.rm = TRUE)) %>% 
-      ungroup()
-    
-    return(data)
-  }
-  
-  
-    # 4.2.3.2. Insessorial
-  
-  ab_insse <- function(data) {
-    data<-data %>%
-      group_by(placette) %>%           
-      mutate(ab_insessorial = sum(specialisation == "Insessorial", na.rm = TRUE)) %>% 
-      ungroup()
-    
-    return(data)
-  }
-  
-  
-    # 4.2.3.3. Terrestrial
-  
-  ab_ter <- function(data) {
-    data<-data %>%
-      group_by(placette) %>%           
-      mutate(ab_terrestrial = sum(specialisation == "Terrestrial", na.rm = TRUE)) %>% 
-      ungroup()
-    
-    return(data)
-  }
-  
-
-  
-}
+   }
+ 
 
    ### 4.3. CALCUL DE LA RICHESSE SPECIFIQUE PAR GUILDE ###
 
@@ -1700,7 +1890,7 @@ if (TRUE) {
   
   bd_oiseaux_propre<-function(data)  {
     data <- data %>%
-      select(-Obs,
+    dplyr ::  select(-Obs,
              -Date,
              -Pluie,
              -Vent,
@@ -1721,8 +1911,8 @@ if (TRUE) {
              -alimentation,
              -rs_NA.x,
              -rs_NA.y,
-             -rs_Aerial,
-             -specialisation)
+             -specialisation
+             )
     return(data)
   }
   
@@ -1748,19 +1938,20 @@ if(TRUE) {
     data<-merge_verna_stoc (data)
     data<-merge_latin_stoc(data)
     data<- merge_guilde_nidification(data)
-    data<-merge_guilde_alim_spe (data)
+    data<-merge_guilde_alim (data)
+    data<-merge_guilde_spe (data)
     data<-ab_cavi(data)
     data<-ab_ins(data)
     data<-ab_arb(data)
     data<-ab_sol(data)
     data<-ab_herb(data)
     data<-ab_omn(data)
-    data<-ab_insse(data)
+    data<-ab_specialist(data)
     data<-ab_gen(data)
-    data<-ab_ter(data)
     data<-rs_spe(data)
     data<-rs_alim(data)
     data<-rs_nidif(data)
+    data<-rs_bird(data)
     data<-bd_oiseaux_propre(data)
     data<-ligne_bird(data)
     
@@ -2218,3 +2409,15 @@ diversite_dmh <- function(data) {
 
 
 test3 <- diversite_dmh (test)
+
+
+alt$placette <- as.character(alt$placette)
+Saisie_DMH_2024_corrige$placette <- as.character(Saisie_DMH_2024_corrige$placette)
+
+
+# Faire un inner join pour ne garder que les placettes communes
+Saisie_DMH_2024_corrige <- inner_join(Saisie_DMH_2024_corrige, alt, by = "placette")
+
+
+write.xlsx(Saisie_DMH_2024_corrige, file="Saisie_DMH_2024_corrige.xlsx")
+

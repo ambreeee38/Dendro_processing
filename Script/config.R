@@ -5,12 +5,18 @@
  library(tidyverse) #tidyverse contient pas mal de fonctions très utliles (ggplot, readxl, readr, %>%). Il fait partie des packages de dplyr
  library(openxlsx) #permet d'utiliser la fonction write.xlsx très pratique pour enregistrer des dataframe de r vers excel
  library(readxl) #permet d'ouvrir un fichier Excel
- library(ggplot2)
+ library(ggplot2) #pour les graph
 library(viridis)
 library(corrplot)
 library(gridExtra)
 library(patchwork)
 library(lme4)
+library(emmeans) #pour faire table d'anova
+library(kableExtra) #pour faire les jolies tables de présentation des sorties de modèle
+library(MuMIn) #pour faire AICc
+library(MASS) #permet d'accéder à des fonctions que le package glm ne gère pas, comme pour binomial negative
+
+
 
 #### 2. Configuration du chemin de direction ####
 if(FALSE){
