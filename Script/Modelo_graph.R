@@ -876,6 +876,14 @@ if(TRUE) {
 
 ### 3.1. Modélisation rs_globale ###
 
+
+hist(ventoux_BD1$rs_tot,
+     main="Histogramme de la variable rs_tot (réponse)",
+     xlab="rs_tot",
+     col="lightblue",
+     breaks=20)
+
+
 #Modèle nul
 
 summary(model_nul <- glm(rs_tot ~ 1,
@@ -888,40 +896,10 @@ summary(model_nul <- glm(rs_tot ~ 1,
     
 if(TRUE) {   
   
- 
-
    summary(tot1 <- glm(rs_tot ~ type_foret*alt,
                 family=negative.binomial, data=ventoux_BD1))
     
   phi1 <- summary(tot1)negative.binomial()phi1 <- summary(tot1)$deviance / summary(tot1)$df.residual #phi = 0.61
-  
-  
-    # Extraire les coefficients du modèle GLM
-    coefficients_df <- summary(tot1)$coefficients
-    
-    # Convertir en data.frame et ajouter les noms de lignes en tant que colonne
-    coefficients_df <- as.data.frame(coefficients_df)
-    coefficients_df <- coefficients_df %>%
-      rownames_to_column("Term")
-    
-    # Renommer les termes pour "Feuillu", "Conifère", et "Mixte"
-    coefficients_df <- coefficients_df %>%
-      mutate(Term = gsub("type_foretfeuillu", "Feuillu", Term),
-             Term = gsub("type_foretconifere", "Conifère", Term),
-             Term = gsub("type_foretmixte", "Mixte", Term))
-    
-    # Créer une jolie table avec kableExtra
-    coefficients_df %>%
-      kable("html", caption = "Coefficients du modèle GLM (Poisson) pour rs_tot selon le type de forêt") %>%
-      kable_styling(bootstrap_options = c("striped", "hover", "responsive")) %>%
-      column_spec(1, bold = TRUE) %>%  # Mettre la colonne des termes en gras
-      column_spec(2, width = "4cm") %>%
-      column_spec(3, width = "4cm") %>%
-      column_spec(4, width = "4cm") %>%
-      # Mettre les p-values en gras
-      column_spec(5, bold = TRUE, color = "black") %>%
-      add_header_above(c("Term", "Estimate", "Std. Error", "z value", "Pr(>|z|)"))  # Pas de duplication des en-têtes
-    
     
 }
 
@@ -977,20 +955,55 @@ if(TRUE) {
 }
 
 
-# (vii) Test modèle global
+# (vii) Test modèle complet et selection descendante par StepAIC (selection d emodèle par l'AIC)
 
 if(TRUE) {
   
-  summary(tot7 <- glm(rs_tot ~ type_foret*alt + densite_BV ,
+  ##MODELE COMPLET##
+  
+  summary(model_complet <- glm(rs_tot ~ pct_st_Conifère*alt + densite_BV + forme ,
                        family=poisson,data= ventoux_BD1))
-  AICc(tot7,tot6,tot5,tot4, tot3, tot2, tot1, model_nul)
+  
+  
+  ##STEPAIC##
+  
+  modele_reduit <- stepAIC(model_complet, direction = "both")
+  summary(modele_reduit)
+  
+  #La sélection ee modèle par StepAIC selectionne comme modèle final celui-ci :
+  
+  #                          rs_tot ~ alt * pct_st_conifere 
+  
+  
+  ##CALCUL DE LA DISPERSION##
+  
+  phi7 <- modele_reduit$deviance / modele_reduit$df.residual #phi = 0.45
+  
+  #On a de la sous dispersion qu'il est mportant de tenir compte. Pour la corriger, on fait une negative binomiale
   
   
   
-  phi7 <- summary(tot7)$deviance / summary(tot7)$df.residual #phi = 0.52
+  ##CORRECTION DE LA SOUS DISPERSION ##
+ 
+  model_reduit2 <- glm(rs_tot ~ pct_st_Conifère * alt,
+                          family = quasipoisson,data = ventoux_BD1)
+  summary(model_reduit2)
   
-  plot(x=fitted(tot7), y=sqrt(abs(residuals(tot7))))
+  #(l'effet de proportion de conifere dépend de l'altitude). On voit que la présence de conifère
+  #a un effet positif sur la richesse spécifique totale avec une augmentation de 0.008 espèce par point
+  #de pourcentage de conifère à altitude constante (p.value < 0.05)
+  #La richesse spécifique totale augmente légèrement avec l'altitude (p.value = 0.004) avec + 0.0003 
+  #espèces par mètre d'altitude.
   
+  #/!\ Quand on regarde l'intéraction, on voit que l'effet de pct_st_conifère dépend de l'altitude !
+  #En effet, avec l'altitude, l'effet positif des confières sur la richesse spécifique total diminue 
+  #voire devient négatif. Ainsi, a haute altitude, une proportion élevée de conifère diminue la richesse
+  #spécifique totale (p.value < 0.05). Cela peut être notamment dû aux conditions défavorables des milieux
+  #de haute altitude où les conifères n'offrent pas des niches écologiques favorables à l'installation
+  #de certaines espèces. Par ailleurs, il est important de tenir compte de l'enforestement du ventoux
+  #qui est assez particulier avec des feuilllus à basse altitude, de nombreux conifères à moyenne altitude
+  #lié à un reboisement de résineux massif dans les années 1860 (Napoléon).Enfin, à plus haute altitude,
+  #des conifères et des feuillus se développent.
   
 }
 
@@ -1015,37 +1028,65 @@ hist(ventoux_BD1$rs_Cavicole,
   hist(ventoux_BD1$rs_tot)
   
   
+  
+  ##MODELE NUL##
+  
   model_nul <- glm(rs_Cavicole ~ 1,
                    family=poisson, data = ventoux_BD1)
   
+  ##MODEL FULL##
   
+  model_full_cavi <- glm(rs_Cavicole ~ vol_BM_tot+ densite_GBM+ densite_dmh_ha + pct_st_Conifère 
+                         *alt + densite_BM_tot + diversite_DMH + densite_souche,
+                           ,
+                   family=poisson, data = ventoux_BD1)
   
-cavi1 <- glm(rs_Cavicole ~  vol_BM_tot,
-                family = poisson,data = ventoux_BD1)
-
-summary(cavi1)
-
-
-AIC(cavi1)
-AIC(model_nul)
-
-
-summary(cavi1)
-
-
-
-vif(cavi1)
-
-mod_test <- glm(rs_Cavicole ~ densite_GBV + densite_BV + vol_BMS_tot + vol_BMD_tot + densite_souche +
-                   densite_A + vol_chandelle_tot + diversite_DMH + densite_dmh_ha + decompo_moyen +
-                  forme +  pct_st_Feuillu + strate_h + strat_sa + strat_a + strat_A + densite_canopy,
-                data = ventoux_BD1, family = poisson)
-
-alias(mod_test)
-
+  ##STEPAIC##
+  
+  modele_reduit_cavi <- stepAIC(model_full_cavi, direction = "both")
+  summary(modele_reduit_cavi)
 
 }
 
+
+
+### 3.3. Modélisation rs_sol ###
+
+if(TRUE) {
+  
+
+
+  #On trace l'histogramme de la distribution de la variable réponse afin de voir si elle suit une distribution
+  #normale. Dans notre cas, la distribution est plutot jolie.
+  
+  
+  hist(ventoux_BD1$rs_Cavicole,
+       main="Histogramme de la variable rs_cavicole (réponse)",
+       xlab="rs_cavi",
+       col="lightblue",
+       breaks=20)
+  
+  hist(ventoux_BD1$rs_tot)
+  
+  
+  
+  ##MODELE NUL##
+  
+  model_nul <- glm(rs_Sol ~ 1,
+                   family=poisson, data = ventoux_BD1)
+  
+  ##MODEL FULL##
+  
+  model_full_sol <- glm(rs_Sol ~ densite_canopy,
+                         ,
+                         family=poisson, data = ventoux_BD1)
+  
+  ##STEPAIC##
+  
+  modele_reduit_cavi <- stepAIC(model_full_cavi, direction = "both")
+  summary(modele_reduit_cavi)
+  
+}
 #### 4. Visualisation graphique variable réponse/variable explicative ayant un effet ####
 
 
