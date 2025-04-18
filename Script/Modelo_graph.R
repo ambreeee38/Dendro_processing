@@ -36,7 +36,7 @@ if(TRUE) {
   
   
   
-  cor_matrix <- cor(ventoux_BD1[, c("rs_Cavicole", "strate_h","strat_sa","strat_a","strat_A", "densite_GBM",
+  cor_matrix <- cor(ventoux_BD1[, c("rs_tot", "nb_DMH_BV", "strate_h","strat_sa","strat_a","strat_A", "densite_GBM",
                                     "densite_GBV", "densite_BMS","densite_BV","densite_canopy","densite_souche",
                                     "densite_dmh_ha", 
                                     "diversite_DMH" ,"vol_BM_tot", "vol_BMD_tot","vol_BMS_tot","vol_chandelle_tot","pct_st_Conifère",
@@ -57,11 +57,9 @@ corrplot(cor_matrix, method = "color", type = "upper",
 #conserver mais bien veiller à ne pas toutes les mettre dans le même modèle !! 
 }
 
-
-
 #### 2. Recherche des outliers et des intéractions potentielles entre variables par visualisation graphique (method = "lm") ####
 
-
+if(TRUE) {
  ### 2.1. Guildes et variables liées au bois mort ###
 
 
@@ -456,8 +454,7 @@ if(TRUE) {
   
   #Apparition des graph sur la meme page plot
   nid_souche + alim_souche
-  000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000 l;                                                  
-  .
+ 
   
   # Pas de valeurs aberrantes ni de corrélation
 }
@@ -868,13 +865,13 @@ if(TRUE) {
   #des effets opposés ?
 }
 
-
-
+}
 
 #### 3. Modélisation ####
 
 
-### 3.1. Modélisation rs_globale ###
+#### 3.1. HYPOTHESE 1 : La diversité des dendromicrohabitats à l'échelle parcellaire favorise la 
+#richesse spécifique globale des oiseaux  indépendemment de l'altitude ####
 
 
 hist(ventoux_BD1$rs_tot,
@@ -884,91 +881,31 @@ hist(ventoux_BD1$rs_tot,
      breaks=20)
 
 
-#Modèle nul
+### 3.1.1. Modèle nul
 
+if(TRUE) {
 summary(model_nul <- glm(rs_tot ~ 1,
                  family=poisson, data = ventoux_BD1))
 
-
-
-
-    # (i) La richesse spécifique totale est plus importante dans une forêt à composition mixte
-    
-if(TRUE) {   
-  
-   summary(tot1 <- glm(rs_tot ~ type_foret*alt,
-                family=negative.binomial, data=ventoux_BD1))
-    
-  phi1 <- summary(tot1)negative.binomial()phi1 <- summary(tot1)$deviance / summary(tot1)$df.residual #phi = 0.61
-    
 }
 
- #(ii) La richesse spécifique totale est plus importante avec la densité de Gros Bois Vivant
-
-if(TRUE) {
-  
-  summary(tot2 <- glm(rs_tot ~ densite_GBV,
-                      family=poisson, data=ventoux_BD1))
-  
-  phi2 <- summary(tot2)$deviance / summary(tot2)$df.residual #phi = 0.62
-}
-
- # (iii) La richesse spécifique totale diminue avec une forte densité d'arbres vivants
-
-if(TRUE) {
-  
-  summary(tot3 <- glm(rs_tot ~ densite_BV,
-                      family=poisson, data=ventoux_BD1))
-  
-  phi3 <- summary(tot3)$deviance / summary(tot3)$df.residual #phi = 0.58
-}
-
-# (iv) La richesse spécifique totale diminue avec une forte densité de souches
-
-if(TRUE) {
-  
-  summary(tot4 <- glm(rs_tot ~ densite_souche,
-                      family=poisson, data=ventoux_BD1))
-  
-  phi4 <- summary(tot4)$deviance / summary(tot4)$df.residual #phi = 0.62
-}
-
-# (v) La richesse spécifique totale varie selon le type d'exploitation
-
-if(TRUE) {
-  
-  summary(tot5 <- glm(rs_tot ~ forme,
-                      family=poisson, data=ventoux_BD1))
-  
-  phi5 <- summary(tot5)$deviance / summary(tot5)$df.residual #phi = 0.52
-}
-
-
-# (vi) La richesse spécifique totale augmente lorsqu'il y a une grande richesse spécifique arborée
-
-if(TRUE) {
-  
-  summary(tot6 <- glm(rs_tot ~ richesse_spe_arbre,
-                      family=poisson, data=ventoux_BD1))
-  
-  phi6 <- summary(tot6)$deviance / summary(tot6)$df.residual #phi = 0.63
-}
-
-
-# (vii) Test modèle complet et selection descendante par StepAIC (selection d emodèle par l'AIC)
+  ## 3.1.2. Modèle complet et selection descendante par StepAIC (selection d emodèle par l'AIC) ###
 
 if(TRUE) {
   
   ##MODELE COMPLET##
   
-  summary(model_complet <- glm(rs_tot ~ pct_st_Conifère*alt + densite_BV + forme ,
+  summary(model_complet <- glmmTMB(rs_tot ~ pct_st_Conifère+alt + densite_canopy + diversite_DMH,
                        family=poisson,data= ventoux_BD1))
   
   
   ##STEPAIC##
   
-  modele_reduit <- stepAIC(model_complet, direction = "both")
+  modele_reduit <- stepAIC(model_complet, direction = "backward")
   summary(modele_reduit)
+  
+  
+ 
   
   #La sélection ee modèle par StepAIC selectionne comme modèle final celui-ci :
   
@@ -979,35 +916,106 @@ if(TRUE) {
   
   phi7 <- modele_reduit$deviance / modele_reduit$df.residual #phi = 0.45
   
-  #On a de la sous dispersion qu'il est mportant de tenir compte. Pour la corriger, on fait une negative binomiale
+  #On a de la sous dispersion qu'il est mportant de tenir compte. Pour la corriger, on pourrait faire
+  #une negative binomiale mais comme dit Yoan "c'est comme enfoncer un clou avec un marteau-piqueur."
+  #Par ailleurs, il me semble que la negative.binomiale corrige la surdispersion.
+  #La correction est trop forte, alors il faut tenir compte d'un autre mode de correction qui est celle
+  #de Conwell et Maxwell (compois).Ainsi, on peut essayer avec le modèle complet en tenant compte
+  #de cette correction 
   
   
+  ##CORRECTION DE LA SOUS DISPERSION##
   
-  ##CORRECTION DE LA SOUS DISPERSION ##
- 
-  model_reduit2 <- glm(rs_tot ~ pct_st_Conifère * alt,
-                          family = quasipoisson,data = ventoux_BD1)
-  summary(model_reduit2)
-  
-  #(l'effet de proportion de conifere dépend de l'altitude). On voit que la présence de conifère
-  #a un effet positif sur la richesse spécifique totale avec une augmentation de 0.008 espèce par point
-  #de pourcentage de conifère à altitude constante (p.value < 0.05)
-  #La richesse spécifique totale augmente légèrement avec l'altitude (p.value = 0.004) avec + 0.0003 
-  #espèces par mètre d'altitude.
-  
-  #/!\ Quand on regarde l'intéraction, on voit que l'effet de pct_st_conifère dépend de l'altitude !
-  #En effet, avec l'altitude, l'effet positif des confières sur la richesse spécifique total diminue 
-  #voire devient négatif. Ainsi, a haute altitude, une proportion élevée de conifère diminue la richesse
-  #spécifique totale (p.value < 0.05). Cela peut être notamment dû aux conditions défavorables des milieux
-  #de haute altitude où les conifères n'offrent pas des niches écologiques favorables à l'installation
-  #de certaines espèces. Par ailleurs, il est important de tenir compte de l'enforestement du ventoux
-  #qui est assez particulier avec des feuilllus à basse altitude, de nombreux conifères à moyenne altitude
-  #lié à un reboisement de résineux massif dans les années 1860 (Napoléon).Enfin, à plus haute altitude,
-  #des conifères et des feuillus se développent.
-  
+  mod_compois <- glmmTMB(
+    rs_tot ~ alt + pct_st_Conifère + densite_dmh_ha + densite_canopy ,
+    family = compois(link = "log"),
+    data = ventoux_BD1
+  )
+  summary(mod_compois)
 }
 
-  ### 3.2. Modélisation rs_cavicole ###
+
+ ## 3.1.3. Modéle par selection descendante et famille compois (Maxwell et Conwall)
+
+   ## 3.1.3.1. Diversite_dmh (qualitatif) ##
+
+if(TRUE) {
+  
+  ##MODELE NUL##
+  mod_compois_rstot_nul <- glmmTMB(
+    rs_tot ~ 1,
+    family = compois(link = "log"),
+    data = ventoux_BD1
+  )
+  summary(mod_compois_rstot_nul)
+  
+  
+  ##MODELE FULL##
+  mod_compois_rstot_full <- glmmTMB(
+    rs_tot ~ alt + pct_st_Conifère + diversite_DMH + densite_canopy + forme + vol_BM_tot + densite_GBV + densite_souche,
+    family = compois(link = "log"),
+    data = ventoux_BD1
+  )
+  summary(mod_compois_rstot_full)
+  
+  ##SELECTION DESCENDANTE##
+  
+     #SANS DENSITE_SOUCHE#
+  mod_compois_rstot_ds <- glmmTMB(
+    rs_tot ~ alt + pct_st_Conifère + diversite_DMH + densite_canopy + forme + densite_GBV,
+    family = compois(link = "log"),
+    data = ventoux_BD1
+  )
+  summary(mod_compois_rstot_ds)
+  
+  
+  #SANS VOLUME BOIS MORT TOTAL#
+  mod_compois_rstot_vbm <- glmmTMB(
+    rs_tot ~ alt + pct_st_Conifère + diversite_DMH + densite_canopy + forme + densite_GBV,
+    family = compois(link = "log"),
+    data = ventoux_BD1
+  )
+  summary(mod_compois_rstot_vbm)
+  
+  
+  #SANS DENSITE GROS BOIS VIVANT#
+  mod_compois_rstot_gbv <- glmmTMB(
+    rs_tot ~ alt + pct_st_Conifère + diversite_DMH + densite_canopy + forme,
+    family = compois(link = "log"),
+    data = ventoux_BD1
+  )
+  summary(mod_compois_rstot_gbv)
+  
+  
+  #SANS CONIFERE#
+  mod_compois_rstot_coni <- glmmTMB(
+    rs_tot ~ alt  + diversite_DMH + densite_canopy + forme,
+    family = compois(link = "log"),
+    data = ventoux_BD1
+  )
+  summary(mod_compois_rstot_coni)
+  #/!\ AIC qui réaugmente quand suppression de la variable pct_st_conifère, même si p.value >0.05.
+  #Donc le modèle conservant les conifère est le meilleur modèle. Il faut maintenant tester ses
+  #paramètres pour voir s'il fit bien les données grâce à DHARMa.
+  
+  
+  
+  ##MODELE FINAL##
+mod_compois1 <- glmmTMB(
+  rs_tot ~ alt + pct_st_Conifère + diversite_DMH + densite_canopy + forme,
+  family = compois(link = "log"),
+  data = ventoux_BD1
+)
+summary(mod_compois1)
+
+mod_compois1_diag <- simulateResiduals(mod_compois1)
+plot(mod_compois1_diag)
+
+
+}
+
+
+  #### 3.2. Modélo rs_cavicole ####
 
 if(TRUE) {
 
@@ -1030,23 +1038,102 @@ hist(ventoux_BD1$rs_Cavicole,
   
   
   ##MODELE NUL##
+  summary(model_nul <- glmmTMB(rs_Cavicole ~ 1,
+                   family=compois (link="log"), data = ventoux_BD1))
   
-  model_nul <- glm(rs_Cavicole ~ 1,
-                   family=poisson, data = ventoux_BD1)
   
-  ##MODEL FULL##
   
-  model_full_cavi <- glm(rs_Cavicole ~ vol_BM_tot+ densite_GBM+ densite_dmh_ha + pct_st_Conifère 
-                         *alt + densite_BM_tot + diversite_DMH + densite_souche,
-                           ,
-                   family=poisson, data = ventoux_BD1)
-  
-  ##STEPAIC##
-  
-  modele_reduit_cavi <- stepAIC(model_full_cavi, direction = "both")
-  summary(modele_reduit_cavi)
+  ##SELECTION DESCENDANTE##
 
+  
+  model_cavi1 <-glmmTMB(rs_Cavicole ~  densite_GBV +densite_GBM+  pct_st_Conifère
+                        +alt  + diversite_DMH + densite_souche + decompo_moyen,
+                        family=compois(link = "log"), data = ventoux_BD1)
+  
+  
+  summary(model_cavi1)
+  
+  #Suppression altitude => p.value = 0.43
+  #AIC = 207.6
+
+  
+  
+  
+  model_cavi2 <-glmmTMB(rs_Cavicole ~  densite_GBV +densite_GBM+  pct_st_Conifère
+                        + diversite_DMH + densite_souche + decompo_moyen,
+                        family=compois(link = "log"), data = ventoux_BD1)
+  
+  
+  
+  summary(model_cavi2)
+  
+  #Suppression de densite_souche (p.value = 0.39)
+  #AIC = 206.2
+  
+  
+  
+  
+  model_cavi3 <-glmmTMB(rs_Cavicole ~  densite_GBV +densite_GBM+  pct_st_Conifère
+                        + diversite_DMH + decompo_moyen,
+                        family=compois(link = "log"), data = ventoux_BD1)
+  
+  
+  
+  summary(model_cavi3)
+  
+  
+  #Suppresion de pct_st_conifere (p.value = 0.62)
+  #AIC = 204.9
+  
+  
+  
+  
+  
+  model_cavi4 <-glmmTMB(rs_Cavicole ~  densite_GBV +densite_GBM
+                        + diversite_DMH  + decompo_moyen,
+                        family=compois(link = "log"), data = ventoux_BD1)
+  
+  
+  summary(model_cavi4)
+  
+  
+  #Suppression de densite_GBM (p.value = 0.62)
+  #AIC = 203.2
+  
+  
+  model_cavi5 <-glmmTMB(rs_Cavicole ~  densite_GBV 
+                        + diversite_DMH  + decompo_moyen,
+                        family=compois(link = "log"), data = ventoux_BD1)
+  
+  
+  summary(model_cavi5)
+  
+  
+  #Suppression de densite_GBV (p.value = 0.23)
+  #AIC=201.4
+  
+  
+  
+  model_cavi6 <-glmmTMB(rs_Cavicole ~  diversite_DMH  + decompo_moyen,
+                        family=compois(link = "log"), data = ventoux_BD1)
+  
+  
+  summary(model_cavi6)
+  
+  
+  ##MODEL FINAL##
+  model_full_cavi <- glmmTMB(rs_Cavicole ~  diversite_DMH + decompo_moyen ,
+                             
+                             family=compois(link = "log"), data = ventoux_BD1)
+  summary(model_full_cavi)
+  
+  #Suppression de decompo_moyen (p.value =0.27)
+  #AIC = 200.7
+  #MODELE FINAL ?
+  
+  
 }
+
 
 
 
@@ -1060,9 +1147,9 @@ if(TRUE) {
   #normale. Dans notre cas, la distribution est plutot jolie.
   
   
-  hist(ventoux_BD1$rs_Cavicole,
-       main="Histogramme de la variable rs_cavicole (réponse)",
-       xlab="rs_cavi",
+  hist(ventoux_BD1$rs_Sol,
+       main="Histogramme de la variable rs_sol (réponse)",
+       xlab="rs_sol",
        col="lightblue",
        breaks=20)
   
@@ -1072,14 +1159,60 @@ if(TRUE) {
   
   ##MODELE NUL##
   
-  model_nul <- glm(rs_Sol ~ 1,
-                   family=poisson, data = ventoux_BD1)
+  summary(model_nul <- glm(rs_Sol ~ 1,
+                   family=poisson, data = ventoux_BD1))
+  
+  summary(model_1 <- glmmTMB(rs_Insectivore ~ pct_st_Conifère +  diversite_DMH + vol_BM_tot ,
+                           family=compois, data = ventoux_BD1))
+  
+  summary(model_1b <- glmmTMB(rs_Sol ~ pct_st_Conifère + alt + diversite_DMH ,
+                         family=genpois(link = "log"), data = ventoux_BD1))  
   
   ##MODEL FULL##
   
-  model_full_sol <- glm(rs_Sol ~ densite_canopy,
-                         ,
+  model_full_sol <- glm(rs_Sol ~ densite_canopy + diversite_DMH + densite_dmh_ha + strate_h +
+                          strat_sa + pct_st_Conifère * alt + densite_BV ,
+                         
                          family=poisson, data = ventoux_BD1)
+  
+  
+  ##STEPAIC##
+  
+  modele_reduit_sol <- stepAIC(model_full_sol, direction = "both")
+  summary(modele_reduit_cavi)
+  
+}
+
+
+### 3.4. Modélisation rs_arboricole ###
+
+if(TRUE) {
+  
+  
+  
+  #On trace l'histogramme de la distribution de la variable réponse afin de voir si elle suit une distribution
+  #normale. Dans notre cas, la distribution est plutot jolie.
+  
+  
+  hist(ventoux_BD1$rs_Arboricole,
+       main="Histogramme de la variable rs_arboricole (réponse)",
+       xlab="rs_cavi",
+       col="lightblue",
+       breaks=20)
+  
+  
+  
+  ##MODELE NUL##
+  
+  summary(model_nul <- glm(rs_Arboricole ~ 1,
+                   family=poisson, data = ventoux_BD1))
+  
+  ##MODEL FULL##
+  
+  model_full_sol <- glm(rs_Arboricole ~ densite_canopy + diversite_DMH + densite_dmh_ha + strate_h +
+                          strat_sa + pct_st_Conifère * alt + densite_BV ,
+                        
+                        family=poisson, data = ventoux_BD1)
   
   ##STEPAIC##
   
@@ -1087,6 +1220,9 @@ if(TRUE) {
   summary(modele_reduit_cavi)
   
 }
+
+
+
 #### 4. Visualisation graphique variable réponse/variable explicative ayant un effet ####
 
 
@@ -1529,5 +1665,67 @@ if(TRUE) {
 
 
 
+
+# (i) La richesse spécifique totale est plus importante dans une forêt à composition mixte
+
+if(TRUE) {   
+  
+  summary(tot1 <- glm(rs_tot ~ type_foret*alt,
+                      family=negative.binomial, data=ventoux_BD1))
+  
+  phi1 <- summary(tot1)negative.binomial()phi1 <- summary(tot1)$deviance / summary(tot1)$df.residual #phi = 0.61
+  
+}
+
+#(ii) La richesse spécifique totale est plus importante avec la densité de Gros Bois Vivant
+
+if(TRUE) {
+  
+  summary(tot2 <- glm(rs_tot ~ densite_GBV,
+                      family=poisson, data=ventoux_BD1))
+  
+  phi2 <- summary(tot2)$deviance / summary(tot2)$df.residual #phi = 0.62
+}
+
+# (iii) La richesse spécifique totale diminue avec une forte densité d'arbres vivants
+
+if(TRUE) {
+  
+  summary(tot3 <- glm(rs_tot ~ densite_BV,
+                      family=poisson, data=ventoux_BD1))
+  
+  phi3 <- summary(tot3)$deviance / summary(tot3)$df.residual #phi = 0.58
+}
+
+# (iv) La richesse spécifique totale diminue avec une forte densité de souches
+
+if(TRUE) {
+  
+  summary(tot4 <- glm(rs_tot ~ densite_souche,
+                      family=poisson, data=ventoux_BD1))
+  
+  phi4 <- summary(tot4)$deviance / summary(tot4)$df.residual #phi = 0.62
+}
+
+# (v) La richesse spécifique totale varie selon le type d'exploitation
+
+if(TRUE) {
+  
+  summary(tot5 <- glm(rs_tot ~ forme,
+                      family=poisson, data=ventoux_BD1))
+  
+  phi5 <- summary(tot5)$deviance / summary(tot5)$df.residual #phi = 0.52
+}
+
+
+# (vi) La richesse spécifique totale augmente lorsqu'il y a une grande richesse spécifique arborée
+
+if(TRUE) {
+  
+  summary(tot6 <- glm(rs_tot ~ richesse_spe_arbre,
+                      family=poisson, data=ventoux_BD1))
+  
+  phi6 <- summary(tot6)$deviance / summary(tot6)$df.residual #phi = 0.63
+}
 
 

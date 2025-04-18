@@ -15,7 +15,7 @@ library(emmeans) #pour faire table d'anova
 library(kableExtra) #pour faire les jolies tables de présentation des sorties de modèle
 library(MuMIn) #pour faire AICc
 library(MASS) #permet d'accéder à des fonctions que le package glm ne gère pas, comme pour binomial negative
-
+library(gamlss)
 
 
 #### 2. Configuration du chemin de direction ####

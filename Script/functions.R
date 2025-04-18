@@ -736,7 +736,6 @@ if(TRUE) {
     
     return(data)
   }
-  
 
 
     ## 1.5.2.2. Calcul du nombre de DMH par hectare (densité par ha)
@@ -751,6 +750,67 @@ densite_dmh_ha <-function (data) {
 }
 
 }
+ 
+   ## 1.5.3. Densité de DMH/placette sur BV ou BM
+ 
+if(TRUE) {
+  
+  
+  densite_dmh_par_type <- function(data) {
+
+    data <- data %>%
+      mutate(
+        nb_DMH_ligne = ifelse(is.na(code.DMH), 0,
+                              str_count(code.DMH, "-") + 1),
+        type.objet = toupper(type.objet)
+      ) %>%
+      group_by(placette) %>%
+      mutate(
+        nb_DMH_BV = sum(nb_DMH_ligne[type.objet == "BV"]),
+        nb_DMH_BM = sum(nb_DMH_ligne[type.objet %in% c("BMD", "BMS")])
+      ) %>%
+      ungroup()
+    
+    return(data)
+  }
+  
+  
+}
+ 
+   ## 1.5.4. Diversite de DMH/placette et sur BM ou BV
+
+if(TRUE) {
+   
+  richesse_bois_vivant <- function(data) {
+    data %>%
+      left_join(
+        data %>%
+          filter(type.objet == "BV") %>%
+          distinct(placette, code.DMH) %>%
+          group_by(placette) %>%
+          summarise(richesse_BV = n(), .groups = "drop"),
+        by = "placette"
+      ) %>%
+      mutate(richesse_BV = replace_na(richesse_BV, 0))
+  }
+  
+  
+  
+  richesse_bois_mort <- function(data) {
+    data %>%
+      left_join(
+        data %>%
+          filter(type.objet %in% c("BMS", "BMD")) %>%
+          distinct(placette, code.DMH) %>%
+          group_by(placette) %>%
+          summarise(richesse_BM = n(), .groups = "drop"),
+        by = "placette"
+      ) %>%
+      mutate(richesse_BM = replace_na(richesse_BM, 0))
+  }
+  
+  }
+ 
 
   ### 1.6. TAUX DE DECOMPOSITION MOYEN ###
 
@@ -1079,13 +1139,14 @@ ff_dmh <- function(data) {
   data <- diversite_dmh (data)
   data <- densite_dmh_parcelle (data)
   data <- densite_dmh_ha (data)
+  data <- densite_dmh_par_type (data)
+  data <- richesse_bois_vivant (data)
+  data <- richesse_bois_mort (data)
   data <- decompo (data)
   data <- nettoyage (data)
   data <- ligne (data)
   return(data)
 }
-
-
 
   ## 1.7.1. Application de la fonction finale au jeu de données initial et enregistrement
 
@@ -1606,7 +1667,15 @@ if(TRUE) {
   }
 }
 
+   ## 4.1.3. Correction de la richesse des espces par le jackknife estimator ##
+ 
+if(TRUE) {}
 
+  
+ 
+ 
+ 
+ 
    ## 4.1.3. Ajout des modes de nidification, d'alimentation et la spécialisation des espèces à data_bird
 
 if(TRUE) {
@@ -1869,7 +1938,7 @@ if(TRUE) {
 }
 
  
-    ### 4.5. NETTOYAGE DU JEU DE DONNEES OISEAUX ###
+    ### 4.5. NETTOYAGE DU JEU DE DONNEES OISEAUX RS###
 
 
 
@@ -1898,10 +1967,6 @@ if (TRUE) {
              -Neige,
              -Nuage,
              -code_stoc,
-             -`0-5min`,
-             -`5-10min`,
-             -`10-15min`,
-             -`15-20min`,
              -rs_NA,
              -Type_Contact,
              -Classe_distance,
@@ -1962,13 +2027,10 @@ if(TRUE) {
   write.xlsx(bird_filtered, file = file_output_bird)
   
 }
- 
- 
- 
 
-   #### 5. BD FINALE (1) ####
+   ### 4.6. BD FINALE (1) ###
  
-        ### 5.1. Définition des paramètres de sortie ###
+        ### 4.6.1. Définition des paramètres de sortie ###
 
 if(TRUE) {
   
@@ -1984,7 +2046,7 @@ if(TRUE) {
   
 }
 
-        ### 5.2. Fusion de data_dmh_couvert et data_bird ###
+        ### 4.6.2. Fusion de data_dmh_couvert et data_bird ###
 
 if(TRUE) {
   
@@ -1992,31 +2054,128 @@ if(TRUE) {
   write.xlsx(BD1, file = file_output_merged_BD1)
   
 }
-
-
-   #### 6. BD FINALE (2) ####
- 
-    ### 6.1. Définition des paramètres de sortie ###
-
- if(TRUE) {
+   
+   ### 4.7 Création jeu de données occurence des sp ###
+   
+   #Création d'une table d'occurence afin de traiter plus finement les impacts par espèces
    
    
-   ## SORTIE
+   ### 4.7.1. Définition des paramètres de sortie ###
    
-   file_output_merged <- file.path(Output_file_ventoux,"data_merged")
-   if (!dir.exists(file_output_merged)) {
-     dir.create(file_output_merged, recursive = TRUE)
+   if(TRUE) {
+     
+     
+     ## SORTIE
+     # Un .XLSX contenant les données bird occu propres
+     file_output_bird_filtered <- file.path(Output_file_ventoux, "data_bird_filtered")
+     if (!dir.exists(file_output_bird_filtered)) {
+       dir.create(file_output_bird_filtered, recursive = TRUE)
+     }
+     file_output_bird_occu <- file.path(file_output_bird_filtered, paste0(SITE,"_bird_occu.xlsx"))
+     
+     #Un .xlsx contenant les données finales (BD2)
+     file_output_merged <- file.path(Output_file_ventoux,"data_merged")
+     if (!dir.exists(file_output_merged)) {
+       dir.create(file_output_merged, recursive = TRUE)
+     }
+     file_output_merged_BD2 <- file.path(file_output_merged,paste0(SITE, "_BD2.xlsx"))
+     
+     
    }
-   file_output_merged_BD2 <- file.path(file_output_merged,paste0(SITE, "_BD2.xlsx"))
    
    
- }
-
-   ### 5.2. Fusion de data_dmh_couvert et data_bird ###
+   ## 4.7.2. Ajout des noms vernaculaires  aux codes du jeu de données "Saisie_2024_Oiseaux" ##
+   
+   
+   if(TRUE) {
+     
+     merge_verna_stoc <- function (data) {
+       data <-data%>%
+         left_join(sp_sites, by = "code_stoc") %>%
+         return (data)
+     }
+     
+   }
+   
+   ## 4.7.3. Création de la table d'occurence  ##
+   
+   #On conserve la donnée heure pour calculer le nombre de minutes aprèsle lever du soleil afin de tenir 
+   #compte du fait que plus le temps passe, moins les oiseaux sont actifs ce qui diminue leur 
+   #proba de détection
+   
+   #On fait ceci afin d'éviter, dans les analyses d'étudier des espèces dont les occurences sont très importantes (que des 1) et 
+   #les espèces trop rares dont les occurences ne sont que des 0. Ce seuil a été défini selon les dires de Yoan Paillet.
+   
+   
+   if(TRUE) {
+     table_occu <- function(data, placette = "placette", nom_vernaculaire = "nom_vernaculaire", heure_col = "Heure", seuil_min = 0.1, seuil_max = 0.8) {
+       
+       # Créer la matrice d'occurrence binaire
+       mat <- table(as.character(data[[placette]]), data[[nom_vernaculaire]])
+       mat[mat > 0] <- 1
+       mat_df <- as.data.frame.matrix(mat)
+       
+       # Ajouter la colonne placette (issue des rownames)
+       mat_df <- tibble::rownames_to_column(mat_df, var = placette)
+       
+       # S'assurer que les colonnes ont le même type
+       data <- data %>%
+         mutate(!!placette := as.character(.data[[placette]]))
+       
+       # Extraire la première heure par placette
+       heure_df <- data %>%
+         group_by(.data[[placette]]) %>%
+         summarise(Heure = first(.data[[heure_col]]), .groups = "drop")
+       
+       # Fusion avec les heures
+       result <- left_join(mat_df, heure_df, by = placette)
+       
+       # Calculer le taux de présence (colonnes espèces uniquement)
+       espece_cols <- setdiff(colnames(result), c(placette, "Heure"))
+       freq <- colMeans(result[espece_cols], na.rm = TRUE)
+       
+       # Garder seulement les espèces entre 10% et 80% d’occurrence
+       especes_gardees <- names(freq[freq >= seuil_min & freq <= seuil_max])
+       
+       # Créer le résultat filtré
+       result_filtre <- result[, c(placette, especes_gardees, "Heure")]
+       
+       return(result_filtre)
+     }
+   }
+   
+    
+   ## 4.7.4. Fonction finale ##
+   
+   if(TRUE) {
+     ff_occu <- function (data) {
+     data <- merge_verna_stoc (data)
+     data <- table_occu (data)
+   }
+   
+   bird_occu <- ff_occu (data_bird)
+   }
+   
+   ## 4.7.5. Enregistrement du data.frame ##
+   
+   if(TRUE) {
+     
+  write.xlsx(bird_occu, file = file_output_bird_occu)
+     
+   }
+   
+   ### 5.2. Fusion de data_dmh_couvert et bird_occu ###
  
  if(TRUE) {
    
-   BD2 <- left_join(bird_filtered, couvert_dmh_merged, by = "placette")
+  # /!\ Importer le jeu de données "bird_occu" + convertir "placette" de BD2 en numerique car on a convertit en numérique la colonne
+  #"placette" du jeu de données "data_dmh_couvert"
+   
+   
+   ventoux_bird_occu$placette <- as.numeric(ventoux_bird_occu$placette)
+   
+   
+   BD2 <- left_join(ventoux_bird_occu, couvert_dmh_merged, by = "placette")
    write.xlsx(BD2, file = file_output_merged_BD2)
    
  }
@@ -2421,3 +2580,42 @@ Saisie_DMH_2024_corrige <- inner_join(Saisie_DMH_2024_corrige, alt, by = "placet
 
 write.xlsx(Saisie_DMH_2024_corrige, file="Saisie_DMH_2024_corrige.xlsx")
 
+
+
+
+
+
+
+###CLASSE DE DMH BASSE BASSE HAUTE HAUTE
+
+
+categorie_dmh <- function(data, var_densite = "densite_dmh_ha", var_diversite = "diversite_DMH") {
+  
+  data <- data %>%
+    mutate(
+      # Standardisation des variables (entre 0 et 1)
+      densite_std = ( .data[[var_densite]] - min(.data[[var_densite]], na.rm = TRUE)) / 
+        (max(.data[[var_densite]], na.rm = TRUE) - min(.data[[var_densite]], na.rm = TRUE)),
+      
+      diversite_std = ( .data[[var_diversite]] - min(.data[[var_diversite]], na.rm = TRUE)) / 
+        (max(.data[[var_diversite]], na.rm = TRUE) - min(.data[[var_diversite]], na.rm = TRUE)),
+      
+      # Catégorisation en "haute" / "basse" selon la médiane
+      cat_densite = if_else(densite_std > median(densite_std, na.rm = TRUE), "haute", "basse"),
+      cat_diversite = if_else(diversite_std > median(diversite_std, na.rm = TRUE), "haute", "basse"),
+      
+      # Combinaison des deux catégories
+      type_placette = paste(cat_densite, cat_diversite, sep = "_")
+    )
+  
+  return(data)
+}
+
+
+test <-  categorie_dmh(ventoux_dmh_filtered)
+
+
+
+
+
+test <- densite_dmh_par_type(data_dmh)
