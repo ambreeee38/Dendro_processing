@@ -1,6 +1,5 @@
-#-----------------------------------------------------------------------------------------------------------
+
 #---------------------------------------------I. VENTOUX-------------------------------------------------------
-#-----------------------------------------------------------------------------------------------------------
 
   #Une fois le jeu de données obtenu, il est important d'analyser la "qualité" des variables explicatives.
 #Pour cela, 4 choses sopnt à vérifier : 
@@ -36,13 +35,9 @@ if(TRUE) {
   
   
   
-  cor_matrix <- cor(ventoux_BD1[, c("rs_tot", "nb_DMH_BV", "strate_h","strat_sa","strat_a","strat_A", "densite_GBM",
-                                    "densite_GBV", "densite_BMS","densite_BV","densite_canopy","densite_souche",
-                                    "densite_dmh_ha", 
-                                    "diversite_DMH" ,"vol_BM_tot", "vol_BMD_tot","vol_BMS_tot","vol_chandelle_tot","pct_st_Conifère",
-                                     "pct_st_Feuillu", 
-                                    "decompo_moyen", "alt", "expo",
-                                    "pente")],use="complete.obs")
+  cor_matrix <- cor(ventoux_BD1[, c("pente","diversite_DMH","alt", "pct_st_Feuillu", "richesse_spe_arbre",
+                                    "nb_DMH_BV", "nb_DMH_BM","decompo_moyen")],use="complete.obs")
+  
   
   
   # Visualisation de la matrice
@@ -57,7 +52,7 @@ corrplot(cor_matrix, method = "color", type = "upper",
 #conserver mais bien veiller à ne pas toutes les mettre dans le même modèle !! 
 }
 
-#### 2. Recherche des outliers et des intéractions potentielles entre variables par visualisation graphique (method = "lm") ####
+ #### 2. Recherche des outliers et des intéractions potentielles entre variables par visualisation graphique (method = "lm") ####
 
 if(TRUE) {
  ### 2.1. Guildes et variables liées au bois mort ###
@@ -867,11 +862,325 @@ if(TRUE) {
 
 }
 
-#### 3. Modélisation ####
+ #### 3. Visualisation DMH exploratoire ####
+  #### 3.1. DMH altitude  ####
+
+if(TRUE){
+  
+
+  # 1. Création d'un format long pour avoir les habitats par type (cavités, epiphytes...)
+  
+  dmh_ventoux_long <- ventoux_BD1 %>%
+    pivot_longer(
+      cols = c(cavites, epiphytes, blessures, BM_houppier, champignons, excroissance, exudats),  # liste exacte des colonnes à transformer
+      names_to = "type_dmh",
+      values_to = "type_dmh_ass"
+    )
+  
+  
+  # 2. Création des classes d'altitudes pour voir à quelles altitudes se trouvent les DMH
+  
+  dmh_ventoux_long$classe_alti <- cut (dmh_ventoux_long$alt,
+                                       breaks = c(300,650,1000,1350,1700),
+                                       labels = c("300-650","650-1000","1000-1350","1350-1700"),
+                                       include.lowest = TRUE)
+  
+  
+  ##% DE PRESENCE DES DMH PAR CLASSES D ALTITUDE ##
+  
+  # 3. Somme des DMH par classe
+  dmh_pct <- dmh_ventoux_long %>%
+    group_by(classe_alti) %>%
+    summarise(nb_dmh = sum(type_dmh_ass, na.rm = TRUE), .groups = "drop") %>%
+    mutate(pct = nb_dmh / sum(nb_dmh))  # conversion en proportion
+  
+  # 4. Graphique
+  ggplot(dmh_pct, aes(x = classe_alti, y = pct, fill = classe_alti)) +
+    geom_bar(stat = "identity", fill="grey") +
+    geom_text(aes(label = nb_dmh), 
+              vjust = -0.5, 
+              size = 4, 
+              color = "black") +
+    labs(
+      title = "Répartition en % des DMH selon la classe d'altitude",
+      x = "Classe d'altitude",
+      y = "% de DMH"
+    ) +
+    theme_minimal() +
+    theme(legend.position = "none")
+  
+  
+  
+  
+  
+  
+  
+  
+  ##NOMBRE DE CHAQUE TYPE DE DMH EN FONCTION DES CLASSES D ALTITUDE##
+               
+  # 1. Calcul des % de chaque type de DMH par classe d'altitude #
+  dmh_pct2 <- dmh_ventoux_long %>%
+    group_by(classe_alti, type_dmh) %>%
+    summarise(nb = sum(type_dmh_ass, na.rm = TRUE), .groups = "drop") %>%
+    group_by(classe_alti) %>%
+    mutate(pct = nb / sum(nb))
+  
+ 
+  
+  
+  # 2. Graphique
+  ggplot(dmh_pct2, aes(x = classe_alti, y = pct, fill = type_dmh)) +
+    geom_bar(stat = "identity", position = position_dodge(width = 0.9), color = "black") +
+    geom_text(
+      aes(label = nb),
+      position = position_dodge(width = 0.9),
+      vjust = -0.5,
+      size = 3
+    ) +
+    scale_fill_brewer(palette = "Set2") +  # Palette scientifique agréable
+    labs(
+      title = "Répartition des types de DMH selon l'altitude",
+      x = "Classe d'altitude",
+      y = "Nombre de DMH",
+      fill = "Type de DMH"
+    ) +
+    theme_minimal() +
+    theme(
+      legend.position = "bottom",
+      plot.title = element_text(face = "bold", size = 14)
+    )
+  
+  
+  
+  
+  
+    
+}
+  #### 3.2. Arbres altitude####
 
 
-#### 3.1. HYPOTHESE 1 : La diversité des dendromicrohabitats à l'échelle parcellaire favorise la 
-#richesse spécifique globale des oiseaux  indépendemment de l'altitude ####
+if(TRUE) {
+  
+  
+  # 1. Passage au format long
+  dmh_ventoux_long_fr <- ventoux_BD1 %>%
+    pivot_longer(
+      cols = c(pct_st_Feuillu, pct_st_Conifère),
+      names_to = "type_arbres",
+      values_to = "pct_st"
+    )
+  
+  # 2. Moyenne des % par type
+  dmh_ventoux_mean <- dmh_ventoux_long_fr %>%
+    group_by(type_arbres) %>%
+    summarise(mean_pct = mean(pct_st, na.rm = TRUE))
+  
+  # 3. Graphique
+  ggplot(dmh_ventoux_mean, aes(x = type_arbres, y = mean_pct)) +
+    geom_bar(stat = "identity", fill = "grey70", color = "black") +
+    geom_text(aes(label = paste0(round(mean_pct), "%")), vjust = -0.5) +
+    scale_y_continuous(limits = c(0, 100)) +
+    labs(
+      title = "Pourcentage moyen de surface terrière des conifères et des feuillus sur le Ventoux",
+      x = "Type d’arbre",
+      y = "% de surface terrière"
+    ) +
+    theme_minimal()
+  
+  
+  # 4. Comparaison avec l'altitude
+  
+ dmh_ventoux_long_fr$classe_alti <- cut (dmh_ventoux_long_fr$alt,
+                                    breaks = c(300,650,1000,1350,1700),
+                                    labels = c("300-650","650-1000","1000-1350","1350-1700"),
+                                    include.lowest = TRUE)
+  
+  
+ 
+ dmh_pct_arbres_alti <- dmh_ventoux_long_fr %>%
+   group_by(classe_alti, type_arbres) %>%
+   summarise(pct = mean(pct_st, na.rm = TRUE), .groups = "drop")  # Moyenne par classe/type
+ 
+ 
+ 
+ # Graphique
+ ggplot(dmh_pct_arbres_alti, aes(x = classe_alti, y = pct, fill = type_arbres)) +
+   geom_bar(stat = "identity", position = position_dodge(width = 0.9), color = "black") +  # position = "fill" -> proportion 0-1
+   labs(
+     title = "Proportion de surface terrière par type d’arbre selon l’altitude",
+     x = "Classe d’altitude",
+     y = "Proportion (%)",
+     fill = "Type d’arbre"
+   ) +
+   theme_minimal()
+ 
+ #/!\ On pourrait ajouter au dessus des barres les surfaces terrières en m2/ha occupées 
+ #par les conifères et les feuillus. Pour cela, besoin de bidouiller les fonctions pour
+ #garder ces données dans le tableau final.
+ 
+}
+  
+
+  #### 3.3. DMH forêt####
+
+
+
+   # 1. Mise en proportion du nombre de DMH
+dmh_pct_foret <- dmh_ventoux_long %>%
+  group_by(type_foret) %>%
+  summarise(nb_dmh = sum(type_dmh_ass, na.rm = TRUE), .groups = "drop") %>%
+  mutate(pct = nb_dmh / sum(nb_dmh))  # conversion en proportion
+
+
+
+
+   # 2. Graphique proportion DMH en fonction du type de forêt 
+ggplot(dmh_pct_foret, aes(x = type_foret, y = pct)) +
+  geom_bar(stat = "identity", fill = "grey70") +
+  geom_text(aes(label = nb_dmh), 
+             vjust = -0.5, 
+             size = 4, 
+             color = "black") +
+  labs(
+    title = "Proportion de DMH en fonction du type de forêt",
+    x = "Type de forêt",
+    y = "Proportion de DMH"
+  ) +
+  theme_minimal()
+
+
+  
+   # 3. Détail du type de DMH par forêt
+
+dmh_pct3 <- dmh_ventoux_long %>%
+  group_by(type_foret, type_dmh) %>%
+  summarise(nb = sum(type_dmh_ass, na.rm = TRUE), .groups = "drop") %>%
+  group_by(type_foret) %>%
+  mutate(pct = nb / sum(nb))
+
+
+
+
+   # 4. Graphique
+ggplot(dmh_pct3, aes(x = type_foret, y = pct, fill = type_dmh)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), color = "black") +
+  geom_text(
+    aes(label = nb),
+    position = position_dodge(width = 0.9),
+    vjust = -0.5,
+    size = 3
+  ) +
+  scale_fill_brewer(palette = "Set2") +  # Palette scientifique agréable
+  labs(
+    title = "Répartition des types de DMH selon le type de forêt sur le Ventoux",
+    x = "Type de foret",
+    y = "Proportion de DMH",
+    fill = "Type de DMH"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(face = "bold", size = 14)
+  )
+
+#### 4. Courbe d'accumulation 
+  
+
+
+
+
+#### 4. Courbe d'accumulation ####
+
+# 1. Pour chaque placette et chaque espèce, déterminer si l’espèce est détectée dans les X premières minutes
+data_detection <- data_bird %>%
+  group_by(placette, code_stoc) %>%
+  summarise(
+    min5  = max(ecoute_1, na.rm = TRUE),
+    min10 = max(ecoute_1, ecoute_2, na.rm = TRUE),
+    min15 = max(ecoute_1, ecoute_2, ecoute_3, na.rm = TRUE),
+    min20 = max(ecoute_1, ecoute_2, ecoute_3, ecoute_4, na.rm = TRUE)
+  ) %>%
+  ungroup()
+
+# 2. Pour chaque placette, compter combien d’espèces ont été détectées au moins une fois dans chaque durée
+richesse_par_placette <- data_detection %>%
+  group_by(placette) %>%
+  summarise(
+    `5`  = sum(min5  == 1),
+    `10` = sum(min10 == 1),
+    `15` = sum(min15 == 1),
+    `20` = sum(min20 == 1)
+  )
+
+# 3. Passer en format long pour ggplot
+richesse_long <- richesse_par_placette %>%
+  pivot_longer(cols = c(`5`, `10`, `15`, `20`), names_to = "duree", values_to = "nb_especes") %>%
+  mutate(duree = as.numeric(duree))
+
+# 4. Tracer la courbe d’accumulation MOYENNE avec intervalle si tu veux
+ggplot(richesse_long, aes(x = duree, y = nb_especes)) +
+  stat_summary(fun = mean, geom = "line", size = 1.2, color = "black") +  # moyenne
+  geom_point(stat = "summary", fun = mean, size = 3, color = "black") +  # points moyens
+  labs(
+    title = "Courbe d'accumulation moyenne des espèces (par placette)",
+    x = "Durée d'écoute (minutes)",
+    y = "Nombre moyen d'espèces détectées"
+  ) +
+  scale_x_continuous(breaks = c(5, 10, 15, 20)) +
+  theme_minimal()
+
+
+
+# 5. On filtre seulement les durées 5 et 20 minutes et on calcule la moyenne par durée
+resume_tibble <- richesse_long %>%
+  filter(duree %in% c(5, 10,15,20)) %>%
+  group_by(duree) %>%
+  summarise(
+    moyenne = mean(nb_especes)
+  )
+
+resume_tibble
+
+
+ # 6. T-test pour voir si la différence entre chaque intervalle est vraiment significatif
+
+#Il faut modifier la durée pour observer les différences
+t_test_result <- t.test(
+  richesse_par_placette$`5`,
+  richesse_par_placette$`20`,
+  paired = TRUE
+)
+#Résultat
+t_test_result
+
+#On voit que même entre 15 et 20 minutes, le test montre qu'on a une augmentation significative 
+#du nombre d'espèces observées (p.value < 0.001) ainsi on pourrait garder toutes les espèces observées
+#durant cette période. En revanche, écologiquement cela ne veut pas dire grand chose.
+#Ainsi, on peut considérer qu'on s'arrête à 15min d'écoute est un bon compromis d'écoute
+#pour capter la richesse des communuatés d'oiseaux.
+
+#En revanche, les espèces entendues ou vues au delà d'une distance de 100m ne sont pas
+#gardées dans le jeu de données car sont uscpetibles de ne pas appartznir à l'aire de répartition
+#de l'oiseau et donc qu'il ne soit pas inféodé à la forêt.
+
+
+ #### 5. Modélisation DMH ####
+
+
+
+
+##PHASE DE TEST##
+model_full_h1_additive_dmh <- glmmTMB(
+  rs_tot ~ alt  + diversite_DMH + pct_st_Feuillu+ strat_sa,
+  family = compois(link = "log"),
+  data = ventoux_BD1
+)
+summary(model_full_h1_additive_dmh)
+
+
+
+
+   #### 3.1. HYPOTHESE 1 : La richesse spécifique totale des oiseaux est favorisée par une grande diversite de dendromicrohabitats  ####
 
 
 hist(ventoux_BD1$rs_tot,
@@ -881,147 +1190,499 @@ hist(ventoux_BD1$rs_tot,
      breaks=20)
 
 
-### 3.1.1. Modèle nul
+### 3.1.1. Modèle nul ###
 
 if(TRUE) {
-summary(model_nul <- glm(rs_tot ~ 1,
-                 family=poisson, data = ventoux_BD1))
-
+  
+  
+  ##MODELE NUL##
+  model_h1_nul <- glmmTMB(
+    rs_tot ~ 1 ,
+    family = compois(link = "log"),
+    data = ventoux_BD1
+  )
+  summary(model_h1_nul)
 }
 
-  ## 3.1.2. Modèle complet et selection descendante par StepAIC (selection d emodèle par l'AIC) ###
+ ### 3.1.2. Modèle complet et selection par AIC ###
+
 
 if(TRUE) {
   
-  ##MODELE COMPLET##
-  
-  summary(model_complet <- glmmTMB(rs_tot ~ pct_st_Conifère+alt + densite_canopy + diversite_DMH,
-                       family=poisson,data= ventoux_BD1))
   
   
-  ##STEPAIC##
   
-  modele_reduit <- stepAIC(model_complet, direction = "backward")
-  summary(modele_reduit)
+  ##MODEL FULL ADDITIVE##
+  
+  model_full_h1_additive_dmh <- glmmTMB(
+    rs_tot ~ alt + pct_st_Feuillu + diversite_DMH + alt + forme + richesse_spe_arbre + densite_GBV + strat_sa + vol_BM_tot + densite_BV,
+    family = compois(link = "log"),
+    data = ventoux_BD1
+  )
+  summary(model_full_h1_additive_dmh)
+  
+  
+  
+
+
+  ##MODEL SANS DENSITE BV##
+  
+  model_full_h1_ans_densitebv_dmh <- glmmTMB(
+    rs_tot ~ alt + pct_st_Feuillu + diversite_DMH + alt + forme + richesse_spe_arbre + densite_GBV + strat_sa + vol_BM_tot,
+    family = compois(link = "log"),
+    data = ventoux_BD1
+  )
+  summary(model_full_h1_ans_densitebv_dmh)
+  
+  
+  ##MODEL SANS DENSITE BV SANS VOL BM TOT
+  model_h1_no_densite_bv_vol_BM_tot_dmh <- glmmTMB(
+    rs_tot ~ alt  + diversite_DMH  + forme  + strat_sa + decompo_moyen,
+    family = compois(link = "log"),
+    data = ventoux_BD1
+  )
+  summary(model_h1_no_densite_bv_vol_BM_tot_dmh)
+  
   
   
  
-  
-  #La sélection ee modèle par StepAIC selectionne comme modèle final celui-ci :
-  
-  #                          rs_tot ~ alt * pct_st_conifere 
+  table(ventoux_BD1$forme)  # Dans le dataset global
+  table(ventoux_BD1$forme[complete.cases(ventoux_BD1[, c("rs_tot", "alt", "diversite_DMH", "forme", "strat_sa", "decompo_moyen")])])
   
   
-  ##CALCUL DE LA DISPERSION##
-  
-  phi7 <- modele_reduit$deviance / modele_reduit$df.residual #phi = 0.45
-  
-  #On a de la sous dispersion qu'il est mportant de tenir compte. Pour la corriger, on pourrait faire
-  #une negative binomiale mais comme dit Yoan "c'est comme enfoncer un clou avec un marteau-piqueur."
-  #Par ailleurs, il me semble que la negative.binomiale corrige la surdispersion.
-  #La correction est trop forte, alors il faut tenir compte d'un autre mode de correction qui est celle
-  #de Conwell et Maxwell (compois).Ainsi, on peut essayer avec le modèle complet en tenant compte
-  #de cette correction 
   
   
-  ##CORRECTION DE LA SOUS DISPERSION##
+  ##MODEL ALT DIVERSITE ARBRE INTERACTION##
   
-  mod_compois <- glmmTMB(
-    rs_tot ~ alt + pct_st_Conifère + densite_dmh_ha + densite_canopy ,
+  model_h1_interaction_diversite_arbre_alt <- glmmTMB(
+    rs_tot ~ alt * diversite_dmh_moy_arbre,
     family = compois(link = "log"),
     data = ventoux_BD1
   )
-  summary(mod_compois)
+  summary(model_h1_interaction_diversite_arbre_alt)
+  
+  
+
+  
+  
+  ##MODEL ALT DIVERSITE PLACETTE INTERACTION##
+  
+  
+  model_h1_interaction_diversite_placette_alt <- glmmTMB(
+    rs_tot ~ alt * diversite_DMH,
+    family = compois(link = "log"),
+    data = ventoux_BD1
+  )
+  summary(model_h1_interaction_diversite_placette_alt)
+  
+  
+  
+  
+  ##MODEL DIVERSITE PLACETTE DIVERSITE ARBRE INTERACTION##
+  
+  model_h1_interaction_diversite_arbre_diversite_placette <- glmmTMB(
+    rs_tot ~ diversite_DMH * diversite_dmh_moy_arbre,
+    family = compois(link = "log"),
+    data = ventoux_BD1
+  )
+  summary(model_h1_interaction_diversite_arbre_diversite_placette)
+  
+  
+  
+  
+  
+  
+  ##MODEL DIVERSITE PLACETTE DIVERSITE ARBRE INTERACTION##
+  
+  model_h1_additive_diversite_arbre_diversite_placette <- glmmTMB(
+    rs_tot ~ diversite_DMH + diversite_dmh_moy_arbre,
+    family = compois(link = "log"),
+    data = ventoux_BD1
+  )
+  summary(model_h1_additive_diversite_arbre_diversite_placette)
+  
+  
+  
+  
+  
+  
+  ##MODEL DIVERSITE ARBRES ##
+  
+  model_h1_diversite_arbre <- glmmTMB(
+    rs_tot ~ diversite_dmh_moy_arbre ,
+    family = compois(link = "log"),
+    data = ventoux_BD1
+  )
+  summary(model_h1_diversite_arbre)
+  
+  
+  
+  
+  
+  
+  ##MODEL DIVERSITE PLACETTES ##
+  
+  model_h1_diversite_placette <- glmmTMB(
+    rs_tot ~ diversite_dmh_moy_arbre ,
+    family = compois(link = "log"),
+    data = ventoux_BD1
+  )
+  summary(model_h1_diversite_placette)
+  
+  
+  
+  
+  
+  
+  ##AIC##
+  
+  AIC(model_h1_interaction_diversite_arbre_diversite_placette,model_h1_interaction_diversite_arbre_alt,
+      model_full_h1_additive_dmh, model_full_h1_interaction_dmh, model_h1_interaction_diversite_placette_alt,
+      model_h1_additive_diversite_arbre_diversite_placette,model_h1_diversite_placette,model_h1_diversite_arbre )
+  
+ 
+  
+  
+   ##MODEL FINAL##
+  
+  model_final_h1 <- glmmTMB(
+    rs_tot ~ alt * diversite_dmh_moy_arbre ,
+    family = compois(link = "log"),
+    data = ventoux_BD1
+  )
+  summary(model_final_h1)
+
+
 }
 
 
- ## 3.1.3. Modéle par selection descendante et famille compois (Maxwell et Conwall)
+   #### 3.2. HYPOTHESE 2 : Une forte diversité de dendromicrohabitats à l'échelle parcellaire 
+#favorise particulièrement la richesse spécifique des insectivores (test avec dmh/arbre pour être
+#sûre de ne louper aucune information) ####
 
-   ## 3.1.3.1. Diversite_dmh (qualitatif) ##
+
+## 3.1.1. Histogramme de la distribution de la variable réponse ##
 
 if(TRUE) {
   
-  ##MODELE NUL##
-  mod_compois_rstot_nul <- glmmTMB(
-    rs_tot ~ 1,
-    family = compois(link = "log"),
-    data = ventoux_BD1
-  )
-  summary(mod_compois_rstot_nul)
+  hist(ventoux_BD1$rs_Insectivore,
+       main="Histogramme de la variable rs_Insectivore (réponse)",
+       xlab="rs_Insectivore",
+       col="lightblue",
+       breaks=20)
   
   
-  ##MODELE FULL##
-  mod_compois_rstot_full <- glmmTMB(
-    rs_tot ~ alt + pct_st_Conifère + diversite_DMH + densite_canopy + forme + vol_BM_tot + densite_GBV + densite_souche,
-    family = compois(link = "log"),
-    data = ventoux_BD1
-  )
-  summary(mod_compois_rstot_full)
+  ### 3.1.2. Modèle nul ###
   
-  ##SELECTION DESCENDANTE##
+  if(TRUE) {
+    
+    
+    ##MODELE NUL##
+    model_h2_nul <- glmmTMB(
+      rs_Insectivore ~ 1 ,
+      family = compois(link = "log"),
+      data = ventoux_BD1
+    )
+    summary(model_h2_nul)
+  }
   
-     #SANS DENSITE_SOUCHE#
-  mod_compois_rstot_ds <- glmmTMB(
-    rs_tot ~ alt + pct_st_Conifère + diversite_DMH + densite_canopy + forme + densite_GBV,
-    family = compois(link = "log"),
-    data = ventoux_BD1
-  )
-  summary(mod_compois_rstot_ds)
-  
-  
-  #SANS VOLUME BOIS MORT TOTAL#
-  mod_compois_rstot_vbm <- glmmTMB(
-    rs_tot ~ alt + pct_st_Conifère + diversite_DMH + densite_canopy + forme + densite_GBV,
-    family = compois(link = "log"),
-    data = ventoux_BD1
-  )
-  summary(mod_compois_rstot_vbm)
-  
-  
-  #SANS DENSITE GROS BOIS VIVANT#
-  mod_compois_rstot_gbv <- glmmTMB(
-    rs_tot ~ alt + pct_st_Conifère + diversite_DMH + densite_canopy + forme,
-    family = compois(link = "log"),
-    data = ventoux_BD1
-  )
-  summary(mod_compois_rstot_gbv)
-  
-  
-  #SANS CONIFERE#
-  mod_compois_rstot_coni <- glmmTMB(
-    rs_tot ~ alt  + diversite_DMH + densite_canopy + forme,
-    family = compois(link = "log"),
-    data = ventoux_BD1
-  )
-  summary(mod_compois_rstot_coni)
-  #/!\ AIC qui réaugmente quand suppression de la variable pct_st_conifère, même si p.value >0.05.
-  #Donc le modèle conservant les conifère est le meilleur modèle. Il faut maintenant tester ses
-  #paramètres pour voir s'il fit bien les données grâce à DHARMa.
-  
-  
-  
-  ##MODELE FINAL##
-mod_compois1 <- glmmTMB(
-  rs_tot ~ alt + pct_st_Conifère + diversite_DMH + densite_canopy + forme,
-  family = compois(link = "log"),
-  data = ventoux_BD1
-)
-summary(mod_compois1)
-
-mod_compois1_diag <- simulateResiduals(mod_compois1)
-plot(mod_compois1_diag)
 
 
+### 3.1.3. Modèle complet et selection par AIC ###
+
+
+if(TRUE) {
+  
+  
+  
+  
+  ##MODEL FULL ADDITIVE##
+  
+  model_full_h2_additive_dmh <- glmmTMB(
+    rs_Insectivore ~ alt + diversite_dmh_moy_arbre + diversite_DMH + (1|placette),
+    family = compois(link = "log"),
+    data = ventoux_BD1
+  )
+  summary(model_full_h2_additive_dmh)
+  
+  
+  
+  
+  
+  ##MODEL FULL INTERACTION##
+  
+  model_full_h2_interaction_dmh <- glmmTMB(
+    rs_Insectivore ~ alt * diversite_dmh_moy_arbre * diversite_DMH + (1|placette),
+    family = compois(link = "log"),
+    data = ventoux_BD1
+  )
+  summary(model_full_h2_interaction_dmh)
+  
+  
+  
+  
+  ##MODEL ALT DIVERSITE ARBRE INTERACTION##
+  
+  model_h2_interaction_diversite_arbre_alt <- glmmTMB(
+    rs_Insectivore ~ alt * diversite_dmh_moy_arbre + (1|placette),
+    family = compois(link = "log"),
+    data = ventoux_BD1
+  )
+  summary(model_h2_interaction_diversite_arbre_alt)
+  
+  
+  
+  
+  ##MODEL ALT DIVERSITE PLACETTE INTERACTION##
+  
+  
+  model_h2_interaction_diversite_placette_alt <- glmmTMB(
+    rs_Insectivore ~ alt * diversite_DMH + (1|placette),
+    family = compois(link = "log"),
+    data = ventoux_BD1
+  )
+  summary(model_h2_interaction_diversite_placette_alt)
+  
+  
+  
+  
+  ##MODEL DIVERSITE PLACETTE DIVERSITE ARBRE INTERACTION##
+  
+  model_h2_interaction_diversite_arbre_diversite_placette <- glmmTMB(
+    rs_Insectivore ~ diversite_DMH * diversite_dmh_moy_arbre + (1|placette),
+    family = compois(link = "log"),
+    data = ventoux_BD1
+  )
+  summary(model_h2_interaction_diversite_arbre_diversite_placette)
+  
+  
+  
+  
+  
+  ##MODEL DIVERSITE PLACETTE DIVERSITE ARBRE ADDITIVE##
+  
+  model_h2_additive_diversite_arbre_diversite_placette <- glmmTMB(
+    rs_Insectivore ~ diversite_DMH + diversite_dmh_moy_arbre + (1|placette),
+    family = compois(link = "log"),
+    data = ventoux_BD1
+  )
+  summary(model_h2_additive_diversite_arbre_diversite_placette)
+  
+  
+  
+  
+  
+  ##MODEL DIVERSITE PLACETTE ##
+  
+  model_h2_diversite_placette <- glmmTMB(
+    rs_Insectivore ~ diversite_DMH +  (1|placette),
+    family = compois(link = "log"),
+    data = ventoux_BD1
+  )
+  summary(model_h2_diversite_placette)
+  
+  
+  
+  
+  
+  ##MODEL DIVERSITE ARBRES ##
+  
+  model_h2_diversite_arbre <- glmmTMB(
+    rs_Insectivore ~ diversite_dmh_moy_arbre +  (1|placette),
+    family = compois(link = "log"),
+    data = ventoux_BD1
+  )
+  summary(model_h2_diversite_arbre)
+  
+  
+  
+  ##AIC##
+  
+  
+  AIC( model_h2_nul,model_h2_interaction_diversite_arbre_diversite_placette,model_h2_interaction_diversite_arbre_alt,
+      model_full_h2_additive_dmh, model_full_h2_interaction_dmh, model_h2_interaction_diversite_placette_alt,
+      model_h2_additive_diversite_arbre_diversite_placette,model_h2_diversite_arbre,model_h2_diversite_placette)
+  
+  
+  
+  
+  
+  ##MODEL FINAL##
+  
+  model_h2_diversite_placette <- glmmTMB(
+    rs_Insectivore ~ diversite_DMH +  (1|placette),
+    family = compois(link = "log"),
+    data = ventoux_BD1
+  )
+  summary(model_h2_diversite_placette)
+  
 }
-
-
-  #### 3.2. Modélo rs_cavicole ####
-
-if(TRUE) {
-
-  ## 3.1.1. Histogramme de la distribution de la variable réponse
   
   
+  #### 3.3. HYPOTHESE 3 : Une forte diversité de dendromicrohabitats à l'échelle de l'arbre et de la placette
+  #favorise particulièrement la richesse spécifique des cavicoles (test avec la desnite à l'echelle de 
+  #la placette pour être sûre de ne pas louper qq chose) ####
+  
+  
+  ## 3.1.1. Histogramme de la distribution de la variable réponse ##
+  
+  if(TRUE) {
+    
+    hist(ventoux_BD1$rs_Cavicole,
+         main="Histogramme de la variable rs_Insectivore (réponse)",
+         xlab="rs_Insectivore",
+         col="lightblue",
+         breaks=20)
+  }
+    
+    ### 3.1.2. Modèle nul ###
+    
+    if(TRUE) {
+      
+      
+      ##MODELE NUL##
+      model_h3_nul <- glmmTMB(
+        rs_Cavicole ~ 1 ,
+        family = compois(link = "log"),
+        data = ventoux_BD1
+      )
+      summary(model_h3_nul)
+    }
+    
+    
+    
+    ### 3.1.3. Modèle complet et selection par AIC ###
+    
+    
+    if(TRUE) {
+      
+      
+      
+      
+      ##MODEL FULL ADDITIVE##
+      
+      model_full_h3_additive_dmh <- glmmTMB(
+        rs_Cavicole ~ alt + diversite_dmh_moy_arbre + diversite_DMH,
+        family = compois(link = "log"),
+        data = ventoux_BD1
+      )
+      summary(model_full_h3_additive_dmh)
+      
+      
+      
+      
+      
+      ##MODEL FULL INTERACTION##
+      
+      model_full_h3_interaction_dmh <- glmmTMB(
+        rs_Cavicole ~ alt * diversite_dmh_moy_arbre * diversite_DMH ,
+        family = compois(link = "log"),
+        data = ventoux_BD1
+      )
+      summary(model_full_h3_interaction_dmh)
+      
+      
+      
+      
+      ##MODEL ALT DIVERSITE ARBRE INTERACTION##
+      
+      model_h3_interaction_diversite_arbre_alt <- glmmTMB(
+        rs_Cavicole ~ alt * diversite_dmh_moy_arbre ,
+        family = compois(link = "log"),
+        data = ventoux_BD1
+      )
+      summary(model_h3_interaction_diversite_arbre_alt)
+      
+      
+      
+      
+      ##MODEL ALT DIVERSITE PLACETTE INTERACTION##
+      
+      
+      model_h3_interaction_diversite_placette_alt <- glmmTMB(
+        rs_Cavicole ~ alt * diversite_DMH ,
+        family = compois(link = "log"),
+        data = ventoux_BD1
+      )
+      summary(model_h3_interaction_diversite_placette_alt)
+      
+      
+      
+      
+      ##MODEL DIVERSITE PLACETTE DIVERSITE ARBRE INTERACTION##
+      
+      model_h3_interaction_diversite_arbre_diversite_placette <- glmmTMB(
+        rs_Cavicole ~ diversite_DMH * diversite_dmh_moy_arbre ,
+        family = compois(link = "log"),
+        data = ventoux_BD1
+      )
+      summary(model_h3_interaction_diversite_arbre_diversite_placette)
+      
+      
+      
+      
+      
+      ##MODEL DIVERSITE PLACETTE DIVERSITE ARBRE ADDITIVE##
+      
+      model_h3_additive_diversite_arbre_diversite_placette <- glmmTMB(
+        rs_Cavicole ~ diversite_DMH + diversite_dmh_moy_arbre,
+        family = compois(link = "log"),
+        data = ventoux_BD1
+      )
+      summary(model_h3_additive_diversite_arbre_diversite_placette)
+      
+      
+      
+      
+      
+      ##MODEL DIVERSITE PLACETTE ##
+      
+      model_h3_diversite_placette <- glmmTMB(
+        rs_Cavicole ~ diversite_DMH  ,
+        family = compois(link = "log"),
+        data = ventoux_BD1
+      )
+      summary(model_h3_diversite_placette)
+      
+      
+      
+      
+      
+      ##MODEL DIVERSITE ARBRES ##
+      
+      model_h3_diversite_arbre <- glmmTMB(
+        rs_Cavicole ~ diversite_dmh_moy_arbre +  (1|placette),
+        family = compois(link = "log"),
+        data = ventoux_BD1
+      )
+      summary(model_h3_diversite_arbre)
+      
+      
+      
+      ##AIC##
+      
+      
+      AIC( model_h3_nul,model_h3_interaction_diversite_arbre_diversite_placette,model_h3_interaction_diversite_arbre_alt,
+           model_full_h3_additive_dmh, model_full_h3_interaction_dmh, model_h3_interaction_diversite_placette_alt,
+           model_h3_additive_diversite_arbre_diversite_placette,model_h3_diversite_arbre,model_h3_diversite_placette)
+      
+      
+      
+      
+      
+      ##MODEL FINAL##
+      
+      model_h3_diversite_placette <- glmmTMB(
+        rs_Cavicole ~ diversite_DMH ,
+        family = compois(link = "log"),
+        data = ventoux_BD1
+      )
+      summary(model_h3_diversite_placette)
+      
+      
+  
+  
+      
   
   #On trace l'histogramme de la distribution de la variable réponse afin de voir si elle suit une distribution
   #normale. Dans notre cas, la distribution est plutot jolie.
@@ -1046,8 +1707,8 @@ hist(ventoux_BD1$rs_Cavicole,
   ##SELECTION DESCENDANTE##
 
   
-  model_cavi1 <-glmmTMB(rs_Cavicole ~  densite_GBV +densite_GBM+  pct_st_Conifère
-                        +alt  + diversite_DMH + densite_souche + decompo_moyen,
+  model_cavi1 <-glmmTMB(rs_Cavicole ~    pct_st_Feuillu + diversite_DMH
+                         ,
                         family=compois(link = "log"), data = ventoux_BD1)
   
   
@@ -1223,6 +1884,9 @@ if(TRUE) {
 
 
 
+  
+  
+  
 #### 4. Visualisation graphique variable réponse/variable explicative ayant un effet ####
 
 
@@ -1729,3 +2393,138 @@ if(TRUE) {
 }
 
 
+  
+  ####5. MODELO AU CAS OU ####
+  
+  ##MODELE COMPLET##
+  
+  summary(model_complet <- glmmTMB(rs_tot ~ pct_st_Conifère+alt + densite_canopy + diversite_DMH + diversite_dmh_moy_arbre,
+                                   family=poisson,data= ventoux_BD1))
+  
+  
+  ##STEPAIC##
+  
+  modele_reduit <- stepAIC(model_complet, direction = "backward")
+  summary(modele_reduit)
+  
+  
+  
+  
+  #La sélection ee modèle par StepAIC selectionne comme modèle final celui-ci :
+  
+  #                          rs_tot ~ alt * pct_st_conifere 
+  
+  
+  ##CALCUL DE LA DISPERSION##
+  
+  phi7 <- modele_reduit$deviance / modele_reduit$df.residual #phi = 0.45
+  
+  #On a de la sous dispersion qu'il est mportant de tenir compte. Pour la corriger, on pourrait faire
+  #une negative binomiale mais comme dit Yoan "c'est comme enfoncer un clou avec un marteau-piqueur."
+  #Par ailleurs, il me semble que la negative.binomiale corrige la surdispersion.
+  #La correction est trop forte, alors il faut tenir compte d'un autre mode de correction qui est celle
+  #de Conwell et Maxwell (compois).Ainsi, on peut essayer avec le modèle complet en tenant compte
+  #de cette correction 
+  
+  
+  ##CORRECTION DE LA SOUS DISPERSION##
+  
+  mod_compois <- glmmTMB(
+    rs_tot ~ alt + pct_st_Conifère + densite_dmh_ha + densite_canopy ,
+    family = compois(link = "log"),
+    data = ventoux_BD1
+  )
+  summary(mod_compois)
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## 3.1.3.1. Diversite_dmh (qualitatif) ##
+
+if(TRUE) {
+  
+  
+  
+  
+  ##MODELE FULL##
+  mod_compois_rstot_full <- glmmTMB(
+    rs_tot ~ alt + pct_st_Conifère + diversite_DMH + densite_canopy + forme + vol_BM_tot + densite_GBV + densite_souche,
+    family = compois(link = "log"),
+    data = ventoux_BD1
+  )
+  summary(mod_compois_rstot_full)
+  
+  ##SELECTION DESCENDANTE##
+  
+  #SANS DENSITE_SOUCHE#
+  mod_compois_rstot_ds <- glmmTMB(
+    rs_tot ~ alt + pct_st_Conifère + diversite_DMH + densite_canopy + forme + densite_GBV,
+    family = compois(link = "log"),
+    data = ventoux_BD1
+  )
+  summary(mod_compois_rstot_ds)
+  
+  
+  #SANS VOLUME BOIS MORT TOTAL#
+  mod_compois_rstot_vbm <- glmmTMB(
+    rs_tot ~ alt + pct_st_Conifère + diversite_DMH + densite_canopy + forme + densite_GBV,
+    family = compois(link = "log"),
+    data = ventoux_BD1
+  )
+  summary(mod_compois_rstot_vbm)
+  
+  
+  #SANS DENSITE GROS BOIS VIVANT#
+  mod_compois_rstot_gbv <- glmmTMB(
+    rs_tot ~ alt + pct_st_Conifère + diversite_DMH + densite_canopy + forme,
+    family = compois(link = "log"),
+    data = ventoux_BD1
+  )
+  summary(mod_compois_rstot_gbv)
+  
+  
+  #SANS CONIFERE#
+  mod_compois_rstot_coni <- glmmTMB(
+    rs_tot ~ alt  + diversite_DMH + densite_canopy + forme,
+    family = compois(link = "log"),
+    data = ventoux_BD1
+  )
+  summary(mod_compois_rstot_coni)
+  #/!\ AIC qui réaugmente quand suppression de la variable pct_st_conifère, même si p.value >0.05.
+  #Donc le modèle conservant les conifère est le meilleur modèle. Il faut maintenant tester ses
+  #paramètres pour voir s'il fit bien les données grâce à DHARMa.
+  
+  
+  
+  ##MODELE FINAL##
+  mod_compois1 <- glmmTMB(
+    rs_tot ~ alt + pct_st_Conifère + diversite_DMH + densite_canopy + forme,
+    family = compois(link = "log"),
+    data = ventoux_BD1
+  )
+  summary(mod_compois1)
+  
+  mod_compois1_diag <- simulateResiduals(mod_compois1)
+  plot(mod_compois1_diag)
+  
+  

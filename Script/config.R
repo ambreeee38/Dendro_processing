@@ -16,7 +16,8 @@ library(kableExtra) #pour faire les jolies tables de présentation des sorties d
 library(MuMIn) #pour faire AICc
 library(MASS) #permet d'accéder à des fonctions que le package glm ne gère pas, comme pour binomial negative
 library(gamlss)
-
+library(glmmTMB)
+library(vegan) #pour le jackknif indiactor
 
 #### 2. Configuration du chemin de direction ####
 if(FALSE){

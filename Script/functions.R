@@ -23,7 +23,7 @@ source(config.R)
 #---------------------------------------------------------------------------------------
 
 #### 1. JEU DMH ####
-
+if(TRUE) {
 
   ### 1.0. Definition des modalités d'entrée et de sortie des jeux de données DMH ###
 
@@ -811,8 +811,82 @@ if(TRUE) {
   
   }
  
+ ## 1.5.5. Diversité DMH par arbre à l'échelle de la placette ##
 
-  ### 1.6. TAUX DE DECOMPOSITION MOYEN ###
+ if(TRUE) {
+   
+ diversite_dmh_arbre <- function(data) {
+   data <- data %>%
+     mutate(
+       nb_dmh_arbre = ifelse(is.na(code.DMH), 0, str_count(code.DMH, "-") + 1)
+     )
+   
+   return(data)
+ }
+ 
+ diversite_dmh_moy_arbre <- function (data) {
+   
+   data <- data %>%
+     group_by(placette)%>%
+     mutate (diversite_dmh_moy_arbre = round(mean (nb_dmh_arbre, na.rm=TRUE), 1))%>%
+     ungroup()
+   
+   return(data)
+ }
+   
+ 
+ }
+  
+  ### 1.6. NOMBRE DE DMH CAVITES, EPIPHYTES.. PAR PLACETTE ###
+  
+  
+  #Fonction faite avec l'IA...
+  
+  type_dmh <- function(data, placette_col = "placette", dmh_col = "code.DMH") {
+    # Dictionnaire des correspondances complètes
+    dmh_mapping <- c(
+      CV11 = "cavites", CV12 = "cavites", CV13 = "cavites", CV114 = "cavites", 
+      CV21 = "cavites", CV22 = "cavites", CV23 = "cavites", CV24 = "cavites", CV25 = "cavites", CV26 = "cavites",
+      CV31 = "cavites", 
+      CV41 = "cavites", CV42 = "cavites", CV43 = "cavites", CV44 = "cavites",
+      EP11 = "epiphytes", EP12 = "epiphytes", EP13 = "epiphytes", EP14 = "epiphytes", EP15 = "epiphytes",
+      EP21 = "epiphytes", EP22 = "epiphytes",
+      EP31 = "epiphytes", EP32 = "epiphytes",
+      EX11 = "exudats", EX12 = "exudats",
+      IN11 = "blessures", IN12 = "blessures", IN13 = "blessures", IN14 = "blessures",
+      IN21 = "blessures", IN22 = "blessures", IN23 = "blessures", IN24 = "blessures", IN25 = "blessures",
+      FU11 = "champignons", 
+      FU21 = "champignons", FU22 = "champignons", FU23 = "champignons", FU24 = "champignons",
+      DE11 = "BM_houppier", DE12 = "BM_houppier", DE13 = "BM_houppier",
+      GR11 = "excroissance", GR12 = "excroissance",
+      GR21 = "excroissance", GR22 = "excroissance"
+    )
+    
+    # Résumé des DMH
+    dmh_summary <- data %>%
+      dplyr::rename(placette = !!sym(placette_col), dmh = !!sym(dmh_col)) %>%
+      tidyr::separate_rows(dmh, sep = "-") %>%
+      dplyr::filter(!is.na(dmh) & dmh != "") %>%
+      dplyr::mutate(
+        type_dmh = dplyr::recode(dmh, !!!dmh_mapping, .default = "autres")
+      ) %>%
+      dplyr::group_by(placette, type_dmh) %>%
+      dplyr::summarise(nb_dmh = dplyr::n(), .groups = "drop") %>%
+      tidyr::pivot_wider(
+        names_from = type_dmh,
+        values_from = nb_dmh,
+        values_fill = list(nb_dmh = 0)
+      )
+    
+    # Ajouter les colonnes au jeu de données d'origine (avec remplacement des NA par 0)
+    data %>%
+      dplyr::left_join(dmh_summary, by = setNames("placette", placette_col)) %>%
+      dplyr::mutate(dplyr::across(all_of(names(dmh_mapping) %>% unique() %>% dplyr::recode(!!!dmh_mapping)), ~replace_na(., 0)))
+  }
+  
+    
+
+  ### 1.7. TAUX DE DECOMPOSITION MOYEN ###
 
 if(TRUE) {
   
@@ -846,11 +920,11 @@ if(TRUE) {
     
     return(data)
   }
- 
+
   
 }
- 
- ### 1.7. ALTITUDE ###
+
+ ### 1.8. ALTITUDE ###
  
  
  if(TRUE){
@@ -884,8 +958,8 @@ if(TRUE) {
      return(data)
    }
  }
- test <- merge_altitude (data_dmh)
- ### 1.8. TOPOGRAPHIE ###
+
+ ### 1.9. TOPOGRAPHIE ###
  
  if(TRUE){
    
@@ -947,7 +1021,7 @@ if(TRUE) {
  
  }
  
- ### 1.9. PENTE ###
+ ### 1.10. PENTE ###
  
  if(TRUE){
    
@@ -982,7 +1056,7 @@ if(TRUE) {
    
  }
  
- ### 1.10. EXPOSITION ###
+ ### 1.11. EXPOSITION ###
  
  if(TRUE){
    
@@ -1017,11 +1091,11 @@ if(TRUE) {
    
  }
 
-   ### 1.11. NETTOYAGE JEU DE DONNEES ###
+   ### 1.12. NETTOYAGE JEU DE DONNEES ###
 
 if(TRUE) {
   
-    ## 1.11.1. Suppression des colonnes qui ne sont plus indispensables dans l'analyse de données ##
+    ## 1.12.1. Suppression des colonnes qui ne sont plus indispensables dans l'analyse de données ##
   
   nettoyage <- function(data){
     data <- data %>%
@@ -1062,7 +1136,7 @@ if(TRUE) {
     return(data)
   }
   
-  ## 1.7.2. Garder une ligne par placette ##
+  ## 1.12.2. Garder une ligne par placette ##
   
   #Dans cette fonction, nous souhaitons conserver uniquement une ligne par placette
   #afin d'avoir un jeu de donées propre (et non pas une ligne pour chaque arbre comme
@@ -1081,7 +1155,7 @@ if(TRUE) {
   ligne <- function(data) {
     data <- data %>%
       distinct(placette, .keep_all = TRUE)
-    colonnes_densite <- c("densite_GBV", "densite_GBM", "densite_BMS", "densite_BV", "densite_BMD", "densite_BM_tot", "densite_souche", "densite_A", "densite_V","densite_dmh_ha", "decompo_moyen")
+    colonnes_densite <- c("densite_GBV", "densite_GBM", "densite_BMS", "densite_BV", "densite_BMD", "densite_BM_tot", "densite_souche", "densite_A", "densite_V","densite_dmh_ha")
     colonnes_volumes <- c("vol_BMD_tot", "vol_BMS_tot", "vol_BM_tot")  
     data <- data %>%
       mutate(across(all_of(colonnes_densite), ~ floor(.)))  
@@ -1094,7 +1168,7 @@ if(TRUE) {
 
 }
 
-   ### 1.12. FONCTION FINALE POUR CALCULER VARIABLES STUCTURELLES ###
+   ### 1.13. FONCTION FINALE POUR CALCULER VARIABLES STUCTURELLES ###
 
 if(TRUE) {
 
@@ -1142,13 +1216,16 @@ ff_dmh <- function(data) {
   data <- densite_dmh_par_type (data)
   data <- richesse_bois_vivant (data)
   data <- richesse_bois_mort (data)
+  data <- diversite_dmh_arbre (data)
+  data <- diversite_dmh_moy_arbre (data)
+  data <- type_dmh (data)
   data <- decompo (data)
   data <- nettoyage (data)
   data <- ligne (data)
   return(data)
 }
 
-  ## 1.7.1. Application de la fonction finale au jeu de données initial et enregistrement
+  ## 1.13.1. Application de la fonction finale au jeu de données initial et enregistrement
 
 dmh_filtered<-ff_dmh(data_dmh)
 write.xlsx(dmh_filtered, file = file_output_dmh)
@@ -1156,11 +1233,12 @@ write.xlsx(dmh_filtered, file = file_output_dmh)
 
 }
  
+}
  
 #### 2. JEU COUVERT ####
 
 
-
+if(TRUE) {
 
    ### 2.0. Definition des modalités d'entrée et de sortie des jeux de données DMH ###
 
@@ -1318,10 +1396,11 @@ if(TRUE) {
   #/!\ Suppression des NA qui n'en sont pas mais qui correspondent en réalité à des 0,
   #ce qui fausse les calculs.
   
+  
+  
   st_cf <- function(data) {
     data <- data %>%
       mutate(N = as.numeric(N))
-    
     st_data <- data %>%
       group_by(placette, Typologie) %>%
       summarise(surface_terriere = sum(N, na.rm = TRUE), .groups = "drop") %>%
@@ -1345,7 +1424,7 @@ if(TRUE) {
     return(data)
   }
   
-  
+
   
   #Création d'une colonne déterminant le type de forêt (feuillu, mixte ou conifère). D'après l'IGN forestier,
   #Les forêts sont considérées comme "pures" dès lors que la présence d'un type (conifère ou feuillu) est 
@@ -1504,6 +1583,10 @@ if(TRUE) {
     
     return(data)
   }
+  
+
+  
+  
 
   ## 2.7.1. Application de la fonction finale au jeu de données initial et enregistrement
   
@@ -1512,9 +1595,10 @@ if(TRUE) {
   
 }
  
- 
+}
 #### 3. FUSION DES JEUX DE DONNEES COUVERT ET DMH ####
 
+ if(TRUE) {
    ### 3.0. Definition des modalités de sortie des jeux de données couvert_dmh_merged ###
 
 if(TRUE) {
@@ -1548,18 +1632,18 @@ if(TRUE) {
 }
 
 
-
+}
 
 
 
 
 #--------------------------------------------------------------------------------------
-#--------------------------------------II. CUICUI--------------------------------------
+#--------------------------------------II. BIRD--------------------------------------
 #--------------------------------------------------------------------------------------
 
    #### 4. JEU OISEAUX ####
 
-
+if(TRUE) {
    ### 4.0. Definition des modalités d'entrée et de sortie des jeux de données DMH ###
 
 if(TRUE) {
@@ -1575,7 +1659,7 @@ if(TRUE) {
   file_data_sites_sp<-file.path(Input_bird_case_file, "sites_sp.xlsx")
   file_data_code_latin<-file.path(Input_bird_case_file, "code_latin.xlsx")
   file_data_bird <-read_excel(file.path(Input_bird_case_file, "Saisie_oiseaux_2024.xlsx"), sheet = "DATA")
-  file_data_spe <- file.path(Input_bird_case_file, "specialisation.xlsx")
+  file_data_spe <- file.path(Input_bird_case_file, "spe.xlsx")
   
   data_bird<- file_data_bird
   
@@ -1614,7 +1698,7 @@ if(TRUE) {
   #Chargement du jeu de données associant la spécialisation des espèces à leur
   #nom latin.
   
-  specialisation = read_excel (file_data_spe)
+  spe = read_excel (file_data_spe)
 
 }
 
@@ -1667,15 +1751,7 @@ if(TRUE) {
   }
 }
 
-   ## 4.1.3. Correction de la richesse des espces par le jackknife estimator ##
- 
-if(TRUE) {}
-
   
- 
- 
- 
- 
    ## 4.1.3. Ajout des modes de nidification, d'alimentation et la spécialisation des espèces à data_bird
 
 if(TRUE) {
@@ -1741,10 +1817,11 @@ if(TRUE) {
  
   merge_guilde_spe<- function (data) {
     data <-data%>%
-      left_join(specialisation, by = "sp_latin") %>%
+      left_join(spe, by = "sp_latin") %>%
       return (data)
   }
 }
+
 
   ### 4.2. CALCUL DE L'ABONDANCE PAR GUILDE ###
 
@@ -1937,14 +2014,24 @@ if(TRUE) {
   
 }
 
- 
-    ### 4.5. NETTOYAGE DU JEU DE DONNEES OISEAUX RS###
+   ### 4.5. Suppression des classes distance supérieures à 5 ###
+   
+   
+ if(TRUE) {
+   
+   classe_distance_delete <- function(data) {
+     data <-data %>%
+       filter(Classe_distance != 5)
+   }
+   
+ }
+    ### 4.6. NETTOYAGE DU JEU DE DONNEES OISEAUX RS###
 
 
 
-      ## 4.5.1. Nettoyage du jeu de données pour tableau 1 ligne par parcelle ##
+      ## 4.6.1. Nettoyage du jeu de données pour tableau 1 ligne par parcelle ##
 
-        ## 4.5.1.1. Nettoyage
+        ## 4.6.1.1. Nettoyage
 
 if (TRUE) {
   
@@ -1983,7 +2070,7 @@ if (TRUE) {
   
 }
 
-   ## 4.5.1.2. Conservation d'une seule ligne par placette ##
+   ## 4.6.1.2. Conservation d'une seule ligne par placette ##
 
 if(TRUE) {
   
@@ -1995,7 +2082,7 @@ if(TRUE) {
   
 }
 
-  ## 4.5.1.3. Fonction finale 1 ##
+  ## 4.6.1.3. Fonction finale 1 ##
 
 if(TRUE) {
   
@@ -2005,6 +2092,7 @@ if(TRUE) {
     data<- merge_guilde_nidification(data)
     data<-merge_guilde_alim (data)
     data<-merge_guilde_spe (data)
+    data <-classe_distance_delete(data)
     data<-ab_cavi(data)
     data<-ab_ins(data)
     data<-ab_arb(data)
@@ -2017,6 +2105,7 @@ if(TRUE) {
     data<-rs_alim(data)
     data<-rs_nidif(data)
     data<-rs_bird(data)
+    data <-classe_distance_delete(data)
     data<-bd_oiseaux_propre(data)
     data<-ligne_bird(data)
     
@@ -2028,9 +2117,9 @@ if(TRUE) {
   
 }
 
-   ### 4.6. BD FINALE (1) ###
+   ### 4.7. BD FINALE (1) ###
  
-        ### 4.6.1. Définition des paramètres de sortie ###
+        ### 4.7.1. Définition des paramètres de sortie ###
 
 if(TRUE) {
   
@@ -2046,7 +2135,7 @@ if(TRUE) {
   
 }
 
-        ### 4.6.2. Fusion de data_dmh_couvert et data_bird ###
+        ### 4.7.2. Fusion de data_dmh_couvert et data_bird ###
 
 if(TRUE) {
   
@@ -2054,13 +2143,13 @@ if(TRUE) {
   write.xlsx(BD1, file = file_output_merged_BD1)
   
 }
-   
-   ### 4.7 Création jeu de données occurence des sp ###
+} 
+   ### 4.8 Création jeu de données occurence des sp ###
    
    #Création d'une table d'occurence afin de traiter plus finement les impacts par espèces
    
    
-   ### 4.7.1. Définition des paramètres de sortie ###
+   ### 4.8.1. Définition des paramètres de sortie ###
    
    if(TRUE) {
      
@@ -2084,7 +2173,7 @@ if(TRUE) {
    }
    
    
-   ## 4.7.2. Ajout des noms vernaculaires  aux codes du jeu de données "Saisie_2024_Oiseaux" ##
+   ## 4.8.2. Ajout des noms vernaculaires  aux codes du jeu de données "Saisie_2024_Oiseaux" ##
    
    
    if(TRUE) {
@@ -2097,7 +2186,7 @@ if(TRUE) {
      
    }
    
-   ## 4.7.3. Création de la table d'occurence  ##
+   ## 4.8.3. Création de la table d'occurence  ##
    
    #On conserve la donnée heure pour calculer le nombre de minutes aprèsle lever du soleil afin de tenir 
    #compte du fait que plus le temps passe, moins les oiseaux sont actifs ce qui diminue leur 
@@ -2145,7 +2234,7 @@ if(TRUE) {
    }
    
     
-   ## 4.7.4. Fonction finale ##
+   ## 4.8.4. Fonction finale ##
    
    if(TRUE) {
      ff_occu <- function (data) {
@@ -2156,7 +2245,7 @@ if(TRUE) {
    bird_occu <- ff_occu (data_bird)
    }
    
-   ## 4.7.5. Enregistrement du data.frame ##
+   ## 4.8.5. Enregistrement du data.frame ##
    
    if(TRUE) {
      
