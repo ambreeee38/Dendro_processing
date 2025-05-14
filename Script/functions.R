@@ -16,7 +16,7 @@
 
 source(config.R)
 
- SITE = "ventoux"
+ SITE = "giffre"
 
 #---------------------------------------------------------------------------------------
 #----------------------------------I. FORET----------------------------------------------
@@ -756,23 +756,26 @@ densite_dmh_ha <-function (data) {
 if(TRUE) {
   
   
-  densite_dmh_par_type <- function(data) {
-
+  densite_dmh_par_type <- function(data, surface_placette = 0.1257) {
+    
     data <- data %>%
       mutate(
         nb_DMH_ligne = ifelse(is.na(code.DMH), 0,
-                              str_count(code.DMH, "-") + 1),
+                              stringr::str_count(code.DMH, "-") + 1),
         type.objet = toupper(type.objet)
       ) %>%
       group_by(placette) %>%
       mutate(
         nb_DMH_BV = sum(nb_DMH_ligne[type.objet == "BV"]),
-        nb_DMH_BM = sum(nb_DMH_ligne[type.objet %in% c("BMD", "BMS")])
+        nb_DMH_BM = sum(nb_DMH_ligne[type.objet %in% c("BMD", "BMS")]),
+        nb_DMH_BV_ha = round(nb_DMH_BV / surface_placette, 0),
+        nb_DMH_BM_ha = round(nb_DMH_BM / surface_placette, 0)
       ) %>%
       ungroup()
     
     return(data)
   }
+  
   
   
 }
@@ -837,13 +840,76 @@ if(TRUE) {
  
  }
   
+  ### 1.6. NOMBRE DE DMH PAR TYPE DE BOIS ###
+  
+  if(TRUE) {
+    dmh_grosseur_bois <- function(data, surface_ha = 0.1257) {
+      library(dplyr)
+      library(tidyr)
+      library(stringr)
+      
+      # Étape 1 : filtrer les BV et BMD
+      data_filtered <- data %>%
+        filter(type.objet %in% c("BV", "BMD")) %>%
+        mutate(
+          classe_diam = case_when(
+            diam >= 30 & diam < 45 ~ "BMoy",
+            diam >= 46 & diam < 60 ~ "GB",
+            diam >= 60 ~ "TGB",
+            TRUE ~ NA_character_
+          )
+        ) %>%
+        filter(!is.na(classe_diam))
+      
+      # Étape 2 : exploser les DMH en lignes
+      dmh_long <- data_filtered %>%
+        mutate(code.DMH = as.character(code.DMH)) %>%
+        separate_rows(code.DMH, sep = "-") %>%
+        filter(!is.na(code.DMH) & code.DMH != "")
+      
+      # Étape 3 : compter les DMH par placette et classe de diamètre
+      dmh_counts <- dmh_long %>%
+        group_by(placette, classe_diam) %>%
+        summarise(nb_DMH = n(), .groups = "drop") %>%
+        pivot_wider(
+          names_from = classe_diam,
+          values_from = nb_DMH,
+          values_fill = list(nb_DMH = 0)
+        ) %>%
+        rename(
+          BMoy_dmh = BMoy,
+          GB_dmh = GB,
+          TGB_dmh = TGB
+        )
+      
+      # Étape 4 : fusion et calculs à l'ha, suppression des colonnes non à l'ha
+      data <- data %>%
+        left_join(dmh_counts, by = "placette") %>%
+        mutate(
+          BMoy_dmh = replace_na(BMoy_dmh, 0),
+          GB_dmh = replace_na(GB_dmh, 0),
+          TGB_dmh = replace_na(TGB_dmh, 0),
+          
+          BMoy_dmh_ha = round(BMoy_dmh / surface_ha),
+          GB_dmh_ha   = round(GB_dmh / surface_ha),
+          TGB_dmh_ha  = round(TGB_dmh / surface_ha)
+        ) %>%
+        dplyr::select(-BMoy_dmh, -GB_dmh, -TGB_dmh)  # Suppression des colonnes non à l'ha
+      
+      return(data)
+    }
+    
+    
+    
+
+    
+
   ### 1.6. NOMBRE DE DMH CAVITES, EPIPHYTES.. PAR PLACETTE ###
   
   
   #Fonction faite avec l'IA...
   
-  type_dmh <- function(data, placette_col = "placette", dmh_col = "code.DMH") {
-    # Dictionnaire des correspondances complètes
+  type_dmh <- function(data, placette_col = "placette", dmh_col = "code.DMH", surface_placette_ha = 0.1257) {
     dmh_mapping <- c(
       CV11 = "cavites", CV12 = "cavites", CV13 = "cavites", CV114 = "cavites", 
       CV21 = "cavites", CV22 = "cavites", CV23 = "cavites", CV24 = "cavites", CV25 = "cavites", CV26 = "cavites",
@@ -862,7 +928,7 @@ if(TRUE) {
       GR21 = "excroissance", GR22 = "excroissance"
     )
     
-    # Résumé des DMH
+    # Résumé des DMH à l'hectare
     dmh_summary <- data %>%
       dplyr::rename(placette = !!sym(placette_col), dmh = !!sym(dmh_col)) %>%
       tidyr::separate_rows(dmh, sep = "-") %>%
@@ -871,20 +937,25 @@ if(TRUE) {
         type_dmh = dplyr::recode(dmh, !!!dmh_mapping, .default = "autres")
       ) %>%
       dplyr::group_by(placette, type_dmh) %>%
-      dplyr::summarise(nb_dmh = dplyr::n(), .groups = "drop") %>%
+      dplyr::summarise(nb_ha = dplyr::n() / surface_placette_ha, .groups = "drop") %>%
       tidyr::pivot_wider(
         names_from = type_dmh,
-        values_from = nb_dmh,
-        values_fill = list(nb_dmh = 0)
-      )
+        values_from = nb_ha,
+        values_fill = list(nb_ha = 0)
+      ) %>%
+      dplyr::mutate(dplyr::across(-placette, ~round(., 0)))  # ← ici on arrondit à l’entier
     
-    # Ajouter les colonnes au jeu de données d'origine (avec remplacement des NA par 0)
-    data %>%
+    dmh_types <- unique(unname(dmh_mapping))
+    
+    result <- data %>%
       dplyr::left_join(dmh_summary, by = setNames("placette", placette_col)) %>%
-      dplyr::mutate(dplyr::across(all_of(names(dmh_mapping) %>% unique() %>% dplyr::recode(!!!dmh_mapping)), ~replace_na(., 0)))
+      dplyr::mutate(dplyr::across(all_of(dmh_types), ~replace_na(., 0)))
+    
+    return(result)
   }
   
-    
+  
+   
 
   ### 1.7. TAUX DE DECOMPOSITION MOYEN ###
 
@@ -1219,6 +1290,7 @@ ff_dmh <- function(data) {
   data <- diversite_dmh_arbre (data)
   data <- diversite_dmh_moy_arbre (data)
   data <- type_dmh (data)
+  data <- dmh_grosseur_bois(data)
   data <- decompo (data)
   data <- nettoyage (data)
   data <- ligne (data)
@@ -1234,7 +1306,7 @@ write.xlsx(dmh_filtered, file = file_output_dmh)
 }
  
 }
- 
+}
 #### 2. JEU COUVERT ####
 
 
@@ -2290,7 +2362,128 @@ if(TRUE) {
  
  ####AU CAS OU ####
  
+ 
+ 
+ 
+ dmh_grosseur_bois_pas_ha <- function(data, surface_ha = 0.1257) {
+   library(dplyr)
+   library(tidyr)
+   library(stringr)
+   
+   # Étape 1 : filtrer les BV et BMD
+   data_filtered <- data %>%
+     filter(type.objet %in% c("BV", "BMD")) %>%
+     mutate(
+       classe_diam = case_when(
+         diam >= 30 & diam < 45 ~ "BMoy",
+         diam >= 46 & diam < 60 ~ "GB",
+         diam >= 60 ~ "TGB",
+         TRUE ~ NA_character_
+       )
+     ) %>%
+     filter(!is.na(classe_diam))
+   
+   # Étape 2 : extraire chaque DMH (séparés par "-") en ligne individuelle
+   dmh_long <- data_filtered %>%
+     mutate(code.DMH = as.character(code.DMH)) %>%
+     separate_rows(code.DMH, sep = "-") %>%  # Chaque DMH devient une ligne
+     filter(!is.na(code.DMH) & code.DMH != "")  # Retirer vides si besoin
+   
+   # Étape 3 : compter le nombre de DMH par placette et classe de diamètre
+   dmh_counts <- dmh_long %>%
+     group_by(placette, classe_diam) %>%
+     summarise(nb_DMH = n(), .groups = "drop") %>%
+     pivot_wider(
+       names_from = classe_diam,
+       values_from = nb_DMH,
+       values_fill = list(nb_DMH = 0)
+     ) %>%
+     rename(
+       BMoy_dmh = BMoy,
+       GB_dmh = GB,
+       TGB_dmh = TGB
+     )
+   
+   # Étape 4 : ajouter les colonnes à ton dataframe original
+   data <- data %>%
+     left_join(dmh_counts, by = "placette") %>%
+     mutate(
+       BMoy_dmh = replace_na(BMoy_dmh, 0),
+       GB_dmh = replace_na(GB_dmh, 0),
+       TGB_dmh = replace_na(TGB_dmh, 0)
+     )
+   
+   return(data)
+ }
+ 
+ 
+ 
+ 
+ type_dmh_pas_ha <- function(data, placette_col = "placette", dmh_col = "code.DMH") {
+   # Dictionnaire des correspondances complètes
+   dmh_mapping <- c(
+     CV11 = "cavites", CV12 = "cavites", CV13 = "cavites", CV114 = "cavites", 
+     CV21 = "cavites", CV22 = "cavites", CV23 = "cavites", CV24 = "cavites", CV25 = "cavites", CV26 = "cavites",
+     CV31 = "cavites", 
+     CV41 = "cavites", CV42 = "cavites", CV43 = "cavites", CV44 = "cavites",
+     EP11 = "epiphytes", EP12 = "epiphytes", EP13 = "epiphytes", EP14 = "epiphytes", EP15 = "epiphytes",
+     EP21 = "epiphytes", EP22 = "epiphytes",
+     EP31 = "epiphytes", EP32 = "epiphytes",
+     EX11 = "exudats", EX12 = "exudats",
+     IN11 = "blessures", IN12 = "blessures", IN13 = "blessures", IN14 = "blessures",
+     IN21 = "blessures", IN22 = "blessures", IN23 = "blessures", IN24 = "blessures", IN25 = "blessures",
+     FU11 = "champignons", 
+     FU21 = "champignons", FU22 = "champignons", FU23 = "champignons", FU24 = "champignons",
+     DE11 = "BM_houppier", DE12 = "BM_houppier", DE13 = "BM_houppier",
+     GR11 = "excroissance", GR12 = "excroissance",
+     GR21 = "excroissance", GR22 = "excroissance"
+   )
+   
+   # Résumé des DMH
+   dmh_summary <- data %>%
+     dplyr::rename(placette = !!sym(placette_col), dmh = !!sym(dmh_col)) %>%
+     tidyr::separate_rows(dmh, sep = "-") %>%
+     dplyr::filter(!is.na(dmh) & dmh != "") %>%
+     dplyr::mutate(
+       type_dmh = dplyr::recode(dmh, !!!dmh_mapping, .default = "autres")
+     ) %>%
+     dplyr::group_by(placette, type_dmh) %>%
+     dplyr::summarise(nb_dmh = dplyr::n(), .groups = "drop") %>%
+     tidyr::pivot_wider(
+       names_from = type_dmh,
+       values_from = nb_dmh,
+       values_fill = list(nb_dmh = 0)
+     )
+   
+   # Ajouter les colonnes au jeu de données d'origine (avec remplacement des NA par 0)
+   data %>%
+     dplyr::left_join(dmh_summary, by = setNames("placette", placette_col)) %>%
+     dplyr::mutate(dplyr::across(all_of(names(dmh_mapping) %>% unique() %>% dplyr::recode(!!!dmh_mapping)), ~replace_na(., 0)))
+ }
+ 
 
+ 
+ 
+ 
+ 
+ 
+ densite_dmh_par_type_pas_ha <- function(data) {
+   
+   data <- data %>%
+     mutate(
+       nb_DMH_ligne = ifelse(is.na(code.DMH), 0,
+                             str_count(code.DMH, "-") + 1),
+       type.objet = toupper(type.objet)
+     ) %>%
+     group_by(placette) %>%
+     mutate(
+       nb_DMH_BV = sum(nb_DMH_ligne[type.objet == "BV"]),
+       nb_DMH_BM = sum(nb_DMH_ligne[type.objet %in% c("BMD", "BMS")])
+     ) %>%
+     ungroup()
+   
+   return(data)
+ } 
 #SURFACE TERRIERE
 
 
